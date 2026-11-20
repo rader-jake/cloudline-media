@@ -3,11 +3,15 @@ import { requireDb } from "@/lib/supabase/admin";
 import { releaseExpiredHolds, type BookingRow } from "@/lib/bookings";
 import { reminderEmail, sendEmail } from "@/lib/email";
 import { json } from "@/lib/request";
+import { localDate, zonedToUtc } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Hourly (see vercel.json): releases abandoned holds and sends 24-hour reminders.
+ * Daily at 13:00 UTC = 8 AM EST / 9 AM EDT (see vercel.json; Vercel Hobby allows one run per day).
+ * Sends a "your shoot is tomorrow" reminder for every confirmed booking up to the end of
+ * tomorrow (ET), and tidies abandoned holds. Holds don't depend on this job: availability
+ * ignores expired holds, payments reject them, and new holds clear them.
  * Protected by CRON_SECRET (Vercel sends "Authorization: Bearer <CRON_SECRET>").
  */
 export async function GET(req: Request) {
@@ -17,14 +21,16 @@ export async function GET(req: Request) {
   const released = await releaseExpiredHolds();
   const sb = requireDb();
   const now = new Date();
-  const in24h = new Date(now.getTime() + 24 * 3600_000);
+  // End of tomorrow in New York = start of the day after tomorrow.
+  const dayAfterTomorrow = localDate(new Date(now.getTime() + 48 * 3600_000));
+  const until = zonedToUtc(dayAfterTomorrow, "00:00");
   const { data: due } = await sb
     .from("bookings")
     .select("*")
     .eq("status", "confirmed")
     .is("reminder_sent_at", null)
     .gt("scheduled_start", now.toISOString())
-    .lte("scheduled_start", in24h.toISOString())
+    .lt("scheduled_start", until.toISOString())
     .returns<BookingRow[]>();
 
   let reminded = 0;

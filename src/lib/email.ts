@@ -94,7 +94,7 @@ export function confirmationEmail(b: BookingRow) {
 }
 
 export function reminderEmail(b: BookingRow) {
-  const heading = "Your shoot is tomorrow";
+  const heading = "Your shoot is coming up";
   const intro = `Hi ${b.customer_name.split(" ")[0]}, a quick reminder that your Cloudline Media shoot is coming up. Please make sure the site is accessible and let us know about anything we should be aware of.`;
   const rows = bookingRows(b);
   return {

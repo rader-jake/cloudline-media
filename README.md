@@ -13,7 +13,7 @@ A mobile-first marketing site and booking flow for Cloudline Media's drone video
 | Address autocomplete  | Google Places API (New), optional                   |
 | Calendar sync         | Google Calendar (service account), optional         |
 | Ads tracking          | Meta Pixel + Conversions API, consent-gated         |
-| Hosting               | Vercel recommended (includes the hourly cron)       |
+| Hosting               | Vercel (Hobby works; the cron runs once a day)       |
 
 ---
 
@@ -103,7 +103,7 @@ Emails the system sends:
 
 - **Booking confirmation** to the customer: package, date, address, deposit, balance and an add-to-calendar link.
 - **Team notification** for each new booking and each FPV quote request.
-- **24-hour reminder**, sent by the cron.
+- **Day-before reminder**, sent each morning by the cron.
 - **Rescheduled**, **needs rescheduling** and **cancelled** notices, sent from admin actions.
 - **FPV quote ready**, which includes a private booking link.
 - **Contact form** messages, sent to the team.
@@ -112,7 +112,7 @@ If Resend isn't configured, emails are **not** sent and nothing pretends otherwi
 
 ### 2.5 Cron: reminders and releasing abandoned holds
 
-`vercel.json` runs `/api/cron/maintenance` every hour. Set `CRON_SECRET` to a long random string; Vercel sends it automatically. On other hosts, call the route hourly with the header `Authorization: Bearer <CRON_SECRET>`.
+`vercel.json` runs `/api/cron/maintenance` once a day at 13:00 UTC (8–9 AM ET), which fits the free Hobby plan. Set `CRON_SECRET` to a long random string; Vercel sends it automatically. On other hosts, call the route daily with the header `Authorization: Bearer <CRON_SECRET>`.
 
 ### 2.6 Google Places address autocomplete (optional)
 
@@ -235,7 +235,7 @@ src/
       payments/deposit        Charges the $20 deposit via Square
       webhooks/square         Signature-verified payment events
       contact                 Contact form (honeypot, timing, rate limits, Turnstile)
-      cron/maintenance        Hold expiry + 24h reminders
+      cron/maintenance        Daily: hold cleanup + day-before reminders
       admin/*                 Admin-only APIs (session + allow-list)
   lib/
     availability.ts           Slot engine (hours, buffers, notice, blocks, holds, Google busy)
