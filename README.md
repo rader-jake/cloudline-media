@@ -4,16 +4,16 @@ A mobile-first marketing site and booking flow for Cloudline Media's drone video
 
 **Ad → Landing page → Choose package → Pick date & time → Enter shoot address → Pay $20 deposit (Square) → Booking confirmed**
 
-| Layer | Tech |
-|---|---|
-| Framework | Next.js 15 (App Router), TypeScript, Tailwind CSS 4 |
-| Database & admin auth | Supabase (Postgres + Auth) |
-| Payments | Square Web Payments SDK + Payments API + webhooks |
-| Email | Resend |
-| Address autocomplete | Google Places API (New), optional |
-| Calendar sync | Google Calendar (service account), optional |
-| Ads tracking | Meta Pixel + Conversions API, consent-gated |
-| Hosting | Vercel recommended (includes the hourly cron) |
+| Layer                 | Tech                                                |
+| --------------------- | --------------------------------------------------- |
+| Framework             | Next.js 15 (App Router), TypeScript, Tailwind CSS 4 |
+| Database & admin auth | Supabase (Postgres + Auth)                          |
+| Payments              | Square Web Payments SDK + Payments API + webhooks   |
+| Email                 | Resend                                              |
+| Address autocomplete  | Google Places API (New), optional                   |
+| Calendar sync         | Google Calendar (service account), optional         |
+| Ads tracking          | Meta Pixel + Conversions API, consent-gated         |
+| Hosting               | Vercel recommended (includes the hourly cron)       |
 
 ---
 
@@ -29,12 +29,12 @@ With no environment variables set, the site still runs. Booking shows an honest 
 
 Useful scripts:
 
-| Command | What it does |
-|---|---|
-| `npm run build` | Production build (also type-checks) |
-| `npm run typecheck` | TypeScript only |
-| `npm run test:availability` | Tests the slot engine: EST/EDT, buffers, holds, blocks, notice |
-| `npm run images` | Regenerates logo variants, favicon and placeholder media from `/assets-src` |
+| Command                     | What it does                                                                |
+| --------------------------- | --------------------------------------------------------------------------- |
+| `npm run build`             | Production build (also type-checks)                                         |
+| `npm run typecheck`         | TypeScript only                                                             |
+| `npm run test:availability` | Tests the slot engine: EST/EDT, buffers, holds, blocks, notice              |
+| `npm run images`            | Regenerates logo variants, favicon and placeholder media from `/assets-src` |
 
 > Requires Node 20+. Tailwind is pinned to 4.1.x because newer 4.x builds need Node ≥ 22.12.
 
@@ -42,7 +42,7 @@ Useful scripts:
 
 ## 2. Set up the integrations
 
-### 2.1 Supabase: database and admin login (required)
+### 2.1 Supabase: database and admin login (required) pushing to vercel
 
 1. Create a project at supabase.com.
 2. In **SQL Editor**, run [`supabase/schema.sql`](supabase/schema.sql). It's safe to re-run.
@@ -133,7 +133,7 @@ To set it up:
 
 1. Create a service account in Google Cloud and enable the **Google Calendar API**.
 2. Create a JSON key for the service account.
-3. In Google Calendar → *Settings and sharing*, share your calendar with the service account email and give it "Make changes to events".
+3. In Google Calendar → _Settings and sharing_, share your calendar with the service account email and give it "Make changes to events".
 4. Set these variables:
    - `GOOGLE_CALENDAR_ID` (your calendar's ID)
    - `GOOGLE_SERVICE_ACCOUNT_EMAIL`
@@ -145,14 +145,14 @@ If Google can't be reached, booking **fails closed**: the site shows "temporaril
 
 Set `NEXT_PUBLIC_META_PIXEL_ID`. Optionally set `META_CAPI_ACCESS_TOKEN` for server-side events. `META_CAPI_TEST_EVENT_CODE` is for testing in Events Manager; remove it when you're done.
 
-| Event | When it fires |
-|---|---|
-| `PageView` | Page load, after the visitor gives consent |
-| `ViewContent` | A package card is at least 50% visible |
-| `InitiateCheckout` | The booking flow starts with a package |
-| `AddPaymentInfo` | The Square payment step opens |
-| `Purchase` | **Only after the server verifies the deposit.** Value is **$20 USD**, the money actually collected, not the service price |
-| `Lead` / `Contact` | An FPV quote request or a contact form is submitted |
+| Event              | When it fires                                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `PageView`         | Page load, after the visitor gives consent                                                                                |
+| `ViewContent`      | A package card is at least 50% visible                                                                                    |
+| `InitiateCheckout` | The booking flow starts with a package                                                                                    |
+| `AddPaymentInfo`   | The Square payment step opens                                                                                             |
+| `Purchase`         | **Only after the server verifies the deposit.** Value is **$20 USD**, the money actually collected, not the service price |
+| `Lead` / `Contact` | An FPV quote request or a contact form is submitted                                                                       |
 
 How tracking handles consent, attribution and deduplication:
 
@@ -200,12 +200,12 @@ For stronger protection, add Cloudflare Turnstile with `NEXT_PUBLIC_TURNSTILE_SI
 
 ## 4. Editing content and media
 
-| What | Where |
-|---|---|
-| Prices, durations, deposit, hours, buffers, service area, policy, contact | `/admin/settings` and `/admin/availability` |
-| Headlines, package copy, FAQ, How It Works, benefits | [`src/content/site.ts`](src/content/site.ts) |
-| Portfolio items | `portfolio` in `src/content/site.ts` |
-| Hero background video | `hero.videoSrc` / `hero.mobileVideoSrc` in `src/content/site.ts` |
+| What                                                                      | Where                                                            |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Prices, durations, deposit, hours, buffers, service area, policy, contact | `/admin/settings` and `/admin/availability`                      |
+| Headlines, package copy, FAQ, How It Works, benefits                      | [`src/content/site.ts`](src/content/site.ts)                     |
+| Portfolio items                                                           | `portfolio` in `src/content/site.ts`                             |
+| Hero background video                                                     | `hero.videoSrc` / `hero.mobileVideoSrc` in `src/content/site.ts` |
 
 ### Replacing media
 
@@ -282,4 +282,5 @@ These parts couldn't be run without real credentials. Test them in sandbox befor
 - The Supabase schema. It was written for Supabase Postgres but wasn't executed during development.
 
 The UI, API validation and guards, and the availability engine were all exercised locally.
+
 # cloudline-media
