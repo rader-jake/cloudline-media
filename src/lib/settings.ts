@@ -88,11 +88,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   policy: {
     // DRAFT — review and approve in /admin/settings before going live.
-    text:
-      "Your $20 deposit reserves your shoot date and is credited toward your final balance. " +
-      "If weather, airspace restrictions, or safety conditions prevent the flight, we will reschedule at no charge. " +
-      "To reschedule or cancel, contact us at least 48 hours before your scheduled shoot. " +
-      "Deposit refunds for customer cancellations are handled according to Cloudline Media's current cancellation terms, which we'll confirm with you by email.",
+    text: "Your $20 deposit reserves your shoot date and time. It is credited toward your total, so it is not an extra fee.\n\nCancel or reschedule 48+ hours ahead: Contact us at least 48 hours before your scheduled start time and we'll refund your deposit in full or move your shoot to a new date at no charge. Refunds go back to your original card and usually appear within 5–10 business days.\n\nLess than 48 hours' notice or no-show: If you cancel within 48 hours of your shoot, or we can't complete it because no one is available or the site isn't accessible at the scheduled time, your deposit is kept to cover the reserved time and travel. No other charge applies.\n\nWeather, airspace & safety: Every flight depends on weather, airspace authorization and on-site safety, and our pilot makes the final call. If conditions prevent the flight, we'll reschedule at no charge. If we can't find a date that works for you, we'll refund your deposit in full.\n\nIf we cancel: If Cloudline Media has to cancel for any other reason, your deposit is refunded in full.\n\nRemaining balance: The remaining balance is due before your final videos are delivered. We'll send you an invoice once editing is complete.",
     approved: false,
   },
   contact: { email: "hello@cloudlinemedia.com", phone: "" },

@@ -141,7 +141,7 @@ export const faq = [
   },
   {
     q: "Can I reschedule my shoot?",
-    a: "Yes. Contact us as early as possible and we'll find a new time that works. Our full deposit and cancellation terms are shown before you pay.",
+    a: "Yes. Contact us at least 48 hours before your shoot to reschedule at no charge or cancel for a full deposit refund. If weather or airspace prevents the flight, we'll reschedule free of charge. Full terms are shown before you pay.",
   },
   {
     q: "Do you travel outside Queens and Long Island?",
