@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @theme {
+  --color-void: #03080d;
   --color-ink: #06111b;
   --color-ink-2: #0a1824;
   --color-panel: #101f2d;
@@ -15,26 +16,44 @@
   --color-warn: #ffc857;
 
   --font-sans: var(--font-manrope), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-archivo), var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+
+  --ease-cine: cubic-bezier(0.16, 1, 0.3, 1);
 
   --shadow-glow: 0 10px 40px -10px rgb(32 184 255 / 0.55);
   --shadow-card: 0 30px 60px -30px rgb(0 0 0 / 0.7);
 
-  --animate-fade-up: fade-up 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  --animate-slow-zoom: slow-zoom 24s ease-out both;
-  --animate-scroll-dot: scroll-dot 2s ease-in-out infinite;
+  --animate-fade-up: fade-up 1s var(--ease-cine) both;
+  --animate-fade-in: fade-in 1.4s ease both;
+  --animate-drift: drift 28s ease-in-out infinite alternate;
+  --animate-scroll-line: scroll-line 2.4s var(--ease-cine) infinite;
+  --animate-marquee: marquee 48s linear infinite;
+  --animate-blink: blink 1.6s steps(2, start) infinite;
 
   @keyframes fade-up {
-    from { opacity: 0; transform: translateY(24px); }
+    from { opacity: 0; transform: translateY(18px); }
     to { opacity: 1; transform: translateY(0); }
   }
-  @keyframes slow-zoom {
-    from { transform: scale(1.12); }
-    to { transform: scale(1); }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
-  @keyframes scroll-dot {
-    0% { transform: translateY(0); opacity: 0; }
-    30% { opacity: 1; }
-    100% { transform: translateY(14px); opacity: 0; }
+  @keyframes drift {
+    from { transform: scale(1.12) translate3d(0, 0, 0); }
+    to { transform: scale(1.04) translate3d(-1.5%, -1%, 0); }
+  }
+  @keyframes scroll-line {
+    0% { transform: scaleY(0); transform-origin: top; }
+    45% { transform: scaleY(1); transform-origin: top; }
+    55% { transform: scaleY(1); transform-origin: bottom; }
+    100% { transform: scaleY(0); transform-origin: bottom; }
+  }
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  @keyframes blink {
+    to { visibility: hidden; }
   }
 }
 
@@ -49,7 +68,7 @@ html {
 }
 
 body {
-  background: var(--color-ink);
+  background: var(--color-void);
   color: #fff;
   font-feature-settings: "ss01", "cv11";
   -webkit-font-smoothing: antialiased;
@@ -66,24 +85,67 @@ body {
   border-radius: 6px;
 }
 
-/* ── Reusable pieces ─────────────────────────────── */
+/* ── Typography ─────────────────────────────────── */
 
-@utility container-x {
-  width: 100%;
-  max-width: 1200px;
-  margin-inline: auto;
-  padding-inline: 1.25rem;
-  @media (width >= 768px) {
-    padding-inline: 2rem;
-  }
+@utility display {
+  font-family: var(--font-display);
+  font-stretch: 125%;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.015em;
+  line-height: 0.92;
 }
 
 @utility eyebrow {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.32em;
   text-transform: uppercase;
   color: var(--color-accent);
+}
+
+/* Small label with a leading hairline: "—— QUEENS · LONG ISLAND" */
+@utility kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.72);
+  &::before {
+    content: "";
+    flex: none;
+    width: 1.5rem;
+    height: 1px;
+    background: var(--color-accent);
+  }
+  @media (width >= 768px) {
+    gap: 0.9rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.34em;
+    &::before {
+      width: 2.25rem;
+    }
+  }
+}
+
+@utility text-outline {
+  color: transparent;
+  -webkit-text-stroke: 1px rgb(255 255 255 / 0.28);
+}
+
+/* ── Layout pieces ──────────────────────────────── */
+
+@utility container-x {
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+  @media (width >= 768px) {
+    padding-inline: 2.5rem;
+  }
 }
 
 @utility card {
@@ -93,18 +155,49 @@ body {
   box-shadow: var(--shadow-card);
 }
 
+@utility hairline {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(169 186 200 / 0.22), transparent);
+}
+
+/* Static film grain — one tiny SVG, no animation, no repaint cost. */
+@utility grain {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.09;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+/* ── Buttons ────────────────────────────────────── */
+
 @utility btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   min-height: 3rem;
   padding-inline: 1.4rem;
-  border-radius: 0.75rem;
+  border-radius: 999px;
   font-weight: 700;
   font-size: 0.95rem;
+  letter-spacing: 0.01em;
   white-space: nowrap;
-  transition: transform 0.2s ease, box-shadow 0.25s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s;
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform 0.35s var(--ease-cine), box-shadow 0.35s ease, background-color 0.25s ease, border-color 0.25s ease, color 0.25s;
+  & svg {
+    transition: transform 0.35s var(--ease-cine);
+  }
+  &:hover:not(:disabled) svg:last-child {
+    transform: translateX(3px);
+  }
   &:active {
     transform: translateY(1px) scale(0.99);
   }
@@ -117,107 +210,262 @@ body {
 
 @utility btn-primary {
   background: var(--color-accent);
-  color: var(--color-ink);
+  color: var(--color-void);
+  /* light sheen that sweeps across on hover */
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.45) 50%, transparent 70%);
+    transform: translateX(-120%);
+    transition: transform 0.8s var(--ease-cine);
+  }
   &:hover:not(:disabled) {
     background: #4cc7ff;
     box-shadow: var(--shadow-glow);
     transform: translateY(-1px);
   }
+  &:hover:not(:disabled)::before {
+    transform: translateX(120%);
+  }
 }
 
 @utility btn-ghost {
-  border: 1.5px solid rgb(255 255 255 / 0.55);
+  border: 1px solid rgb(255 255 255 / 0.34);
   color: #fff;
-  background: rgb(6 17 27 / 0.2);
-  backdrop-filter: blur(6px);
+  background: rgb(3 8 13 / 0.25);
+  backdrop-filter: blur(8px);
   &:hover:not(:disabled) {
-    border-color: var(--color-accent);
-    color: var(--color-accent-soft);
+    border-color: rgb(255 255 255 / 0.85);
+    background: rgb(255 255 255 / 0.06);
     transform: translateY(-1px);
+  }
+}
+
+/* Text link with an animated underline */
+@utility link-line {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  &::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -4px;
+    height: 1px;
+    background: currentColor;
+    transform: scaleX(0.35);
+    transform-origin: left;
+    transition: transform 0.5s var(--ease-cine);
+  }
+  &:hover::after {
+    transform: scaleX(1);
   }
 }
 
 @utility field {
   width: 100%;
-  min-height: 3rem;
-  border-radius: 0.75rem;
-  background: rgb(6 17 27 / 0.6);
-  border: 1px solid rgb(169 186 200 / 0.22);
-  padding: 0.7rem 0.9rem;
+  min-height: 3.1rem;
+  border-radius: 0.8rem;
+  background: rgb(3 8 13 / 0.55);
+  border: 1px solid rgb(169 186 200 / 0.2);
+  padding: 0.7rem 0.95rem;
   color: #fff;
   font-size: 16px; /* prevents iOS zoom */
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
   &::placeholder {
-    color: rgb(169 186 200 / 0.55);
+    color: rgb(169 186 200 / 0.5);
+  }
+  &:hover {
+    border-color: rgb(169 186 200 / 0.34);
   }
   &:focus {
     outline: none;
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px rgb(32 184 255 / 0.18);
+    background: rgb(3 8 13 / 0.75);
+    box-shadow: 0 0 0 4px rgb(32 184 255 / 0.14);
   }
   &[aria-invalid="true"] {
     border-color: var(--color-danger);
   }
 }
 
-/* Scroll-reveal (toggled by <Reveal/>) */
-.reveal {
+/* ── Motion ─────────────────────────────────────── */
+/* Hidden start states apply only when JS is running (html.js), so content is never lost. */
+
+.js .reveal {
   opacity: 0;
-  transform: translateY(28px);
-  transition: opacity 0.8s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transform: translateY(32px);
+  transition: opacity 1s var(--ease-cine), transform 1.1s var(--ease-cine);
   transition-delay: var(--reveal-delay, 0ms);
 }
-.reveal.is-visible {
+.js .reveal.is-visible {
   opacity: 1;
   transform: none;
 }
 
-/* ── Drone fly-by ───────────────────────────────── */
-.drone-flyby {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  pointer-events: none;
-  z-index: 40;
+/* Masked line rise for headlines: <span class="line-mask"><span class="line">…</span></span> */
+.line-mask {
+  display: block;
   overflow: hidden;
+  padding-bottom: 0.06em;
+  margin-bottom: -0.06em;
 }
-.drone-flyby__craft {
+.line-mask > .line {
+  display: block;
+  animation: line-rise 1.2s var(--ease-cine) both;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes line-rise {
+  from { transform: translateY(105%); }
+  to { transform: translateY(0); }
+}
+
+/* Image unveils with a wipe when its parent Reveal becomes visible */
+.js .reveal .img-wipe {
+  clip-path: inset(0 0 0 100%);
+  transition: clip-path 1.4s var(--ease-cine);
+  transition-delay: calc(var(--reveal-delay, 0ms) + 120ms);
+}
+.js .reveal.is-visible .img-wipe {
+  clip-path: inset(0 0 0 0);
+}
+.js .reveal .img-settle {
+  transform: scale(1.14);
+  transition: transform 2.2s var(--ease-cine);
+}
+.js .reveal.is-visible .img-settle {
+  transform: scale(1);
+}
+
+/* ── Signature: drone pass that wipes the next frame into view ─────────────
+   The track spans the frame's width; translateX(%) is relative to that width, so the
+   drone's nose sits exactly on the wipe edge for the whole pass (same duration + easing). */
+.drone-pass {
+  position: relative;
+  --pass: 2.2s;
+  --pass-ease: cubic-bezier(0.62, 0, 0.3, 1);
+}
+.drone-pass__track {
   position: absolute;
-  top: 34vh;
+  z-index: 3;
+  inset: 0;
+  pointer-events: none;
+  transform: translateX(100%);
+  visibility: hidden;
+}
+.drone-pass__craft {
+  position: absolute;
+  top: 50%;
   left: 0;
-  width: 132px;
-  animation: drone-path 2.8s cubic-bezier(0.45, 0.05, 0.4, 0.95) forwards;
-  filter: drop-shadow(0 6px 14px rgb(0 0 0 / 0.45));
+  width: clamp(84px, 9vw, 128px);
+  translate: -18% -50%;
+  filter: drop-shadow(0 22px 22px rgb(0 0 0 / 0.6)) drop-shadow(0 0 18px rgb(32 184 255 / 0.25));
 }
-.drone-flyby__trail {
+.drone-pass__trail {
   position: absolute;
-  top: 46%;
-  left: 78%;
-  width: 260px;
-  height: 2px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, rgb(32 184 255 / 0.85), rgb(32 184 255 / 0));
-  box-shadow: 0 0 12px rgb(32 184 255 / 0.6);
+  top: 50%;
+  left: 70%;
+  width: 46vw;
+  height: 1px;
+  background: linear-gradient(90deg, rgb(32 184 255 / 0.95), transparent);
+  box-shadow: 0 0 14px rgb(32 184 255 / 0.7);
 }
-.drone-flyby__rotor {
+.drone-pass__rotor {
   transform-box: fill-box;
   transform-origin: center;
-  animation: rotor 0.12s linear infinite;
+  animation: rotor 0.08s linear infinite;
 }
 @keyframes rotor {
-  0% { transform: scaleX(1); }
-  50% { transform: scaleX(0.35); }
-  100% { transform: scaleX(1); }
+  to { transform: rotate(360deg); }
 }
-@keyframes drone-path {
-  0% { transform: translate(105vw, 0) rotate(-4deg); opacity: 0; }
-  10% { opacity: 1; }
-  30% { transform: translate(70vw, -22px) rotate(-6deg); }
-  55% { transform: translate(42vw, 14px) rotate(-5deg); }
-  80% { transform: translate(14vw, -10px) rotate(-7deg); opacity: 1; }
-  100% { transform: translate(-25vw, -30px) rotate(-8deg); opacity: 0; }
+.js .drone-pass__frame {
+  clip-path: inset(0 0 0 100%);
+}
+.drone-pass.is-flying .drone-pass__frame {
+  animation: frame-wipe var(--pass) var(--pass-ease) forwards;
+}
+.drone-pass.is-flying .drone-pass__track {
+  visibility: visible;
+  animation: track-pass var(--pass) var(--pass-ease) forwards;
+}
+.drone-pass.is-flying .drone-pass__craft {
+  animation: craft-exit 0.7s cubic-bezier(0.4, 0, 1, 1) var(--pass) forwards;
+}
+@keyframes frame-wipe {
+  from { clip-path: inset(0 0 0 100%); }
+  to { clip-path: inset(0 0 0 0); }
+}
+@keyframes track-pass {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0%); }
+}
+@keyframes craft-exit {
+  to { transform: translate3d(-60vw, -40px, 0) rotate(-8deg); opacity: 0; }
+}
+
+/* ── Time-lapse timecode: counts 02:00:00 down to 00:00:30 (CSS only) ─────
+   Integers in counter-reset round to nearest, so "- 0.5" floors the division. */
+@property --tc {
+  syntax: "<integer>";
+  inherits: false;
+  initial-value: 7200;
+}
+.timecode {
+  --tc: 7200;
+  counter-reset: h calc(var(--tc) / 3600 - 0.5) m calc(mod(var(--tc), 3600) / 60 - 0.5) s calc(mod(var(--tc), 60));
+  font-variant-numeric: tabular-nums;
+}
+.reveal.is-visible .timecode {
+  animation: tc 3.4s cubic-bezier(0.7, 0, 0.2, 1) 0.7s forwards;
+}
+@keyframes tc {
+  to { --tc: 30; }
+}
+.timecode::before {
+  content: counter(h, decimal-leading-zero) ":" counter(m, decimal-leading-zero) ":" counter(s, decimal-leading-zero);
+}
+
+.tl-progress {
+  transform: scaleX(1);
+}
+.js .reveal .tl-progress {
+  transform: scaleX(0);
+}
+.js .reveal.is-visible .tl-progress {
+  animation: tl-bar 3.4s cubic-bezier(0.7, 0, 0.2, 1) 0.7s forwards;
+}
+@keyframes tl-bar {
+  to { transform: scaleX(1); }
+}
+
+/* ── Possibilities: scene captions cycle (8 scenes × 3s) ──────────────── */
+.scene-cycle > * {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  animation: scene 24s linear infinite;
+}
+.scene-cycle > *:first-child {
+  opacity: 1;
+}
+@keyframes scene {
+  0% { opacity: 0; transform: translateY(10px); filter: blur(4px); }
+  2.5% { opacity: 1; transform: none; filter: none; }
+  10.5% { opacity: 1; transform: none; filter: none; }
+  12.5% { opacity: 0; transform: translateY(-10px); filter: blur(4px); }
+  100% { opacity: 0; }
+}
+
+.pf-route {
+  animation: route 6s linear infinite;
+}
+@keyframes route {
+  to { stroke-dashoffset: -120; }
 }
 
 /* ── Reduced motion ─────────────────────────────── */
@@ -230,10 +478,28 @@ body {
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
   }
-  .reveal {
+  .js .reveal,
+  .js .drone-pass__frame {
     opacity: 1;
     transform: none;
+    clip-path: none;
+  }
+  .drone-pass__track {
+    display: none;
+  }
+  .js .reveal .tl-progress {
+    transform: scaleX(1);
+  }
+  /* Show only the first scene instead of cycling */
+  .scene-cycle > * {
+    animation: none !important;
+    opacity: 0;
+  }
+  .scene-cycle > *:first-child {
+    opacity: 1;
   }
 }

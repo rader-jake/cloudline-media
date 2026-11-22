@@ -20,8 +20,8 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
 
   return (
     <>
-      <Nav solid />
-      <main id="main" className="min-h-dvh bg-[radial-gradient(ellipse_at_top,_#10273a_0%,_#06111B_55%)] pb-24 pt-24 md:pt-28">
+      <Nav variant="checkout" />
+      <main id="main" className="min-h-dvh bg-[radial-gradient(90%_60%_at_50%_0%,#10273a_0%,#06111B_50%,#03080d_100%)] pb-24 pt-28 md:pt-36">
         <BookingWizard
           config={{
             settings: publicSettings(settings),

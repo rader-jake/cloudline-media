@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
-import { CircleCheck, Loader2, Mail, Phone, Send } from "lucide-react";
+import { CircleCheck, Loader2, Send } from "lucide-react";
 import { contactFormSchema, fieldErrors } from "@/lib/validation";
 import { track } from "@/lib/analytics";
-import { Reveal } from "./Reveal";
 
 const TURNSTILE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
@@ -15,49 +14,8 @@ declare global {
   }
 }
 
-export function ContactSection({ email, phone }: { email: string; phone: string }) {
-  return (
-    <section id="contact" className="scroll-mt-20 bg-gradient-to-b from-ink to-ink-2 py-20 md:py-28">
-      <div className="container-x grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16">
-        <Reveal>
-          <p className="eyebrow">Contact</p>
-          <h2 className="mt-3 text-4xl font-extrabold tracking-tight md:text-5xl">Custom Project? Let&apos;s Talk.</h2>
-          <p className="mt-4 text-lg leading-relaxed text-mist">
-            Multi-day construction coverage, interior FPV, commercial properties or anything else — tell us about it and we&apos;ll reply with
-            options and a quote.
-          </p>
-          <ul className="mt-8 space-y-4">
-            {email && (
-              <li>
-                <a href={`mailto:${email}`} className="flex items-center gap-3 font-semibold hover:text-accent">
-                  <span className="grid size-11 place-items-center rounded-xl border border-line bg-panel">
-                    <Mail className="size-5 text-accent" aria-hidden />
-                  </span>
-                  {email}
-                </a>
-              </li>
-            )}
-            {phone && (
-              <li>
-                <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="flex items-center gap-3 font-semibold hover:text-accent">
-                  <span className="grid size-11 place-items-center rounded-xl border border-line bg-panel">
-                    <Phone className="size-5 text-accent" aria-hidden />
-                  </span>
-                  {phone}
-                </a>
-              </li>
-            )}
-          </ul>
-        </Reveal>
-        <Reveal delay={120}>
-          <ContactForm />
-        </Reveal>
-      </div>
-    </section>
-  );
-}
-
-function ContactForm() {
+/** Contact form for custom projects. Spam protection: honeypot, time-trap, rate limit, optional Turnstile. */
+export function ContactForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -114,7 +72,7 @@ function ContactForm() {
 
   if (state === "sent") {
     return (
-      <div className="card flex flex-col items-center p-10 text-center" role="status">
+      <div className="flex flex-col items-center py-10 text-center" role="status">
         <CircleCheck className="size-12 text-success" aria-hidden />
         <p className="mt-4 text-2xl font-bold">Message sent!</p>
         <p className="mt-2 text-mist">Thanks for reaching out — we&apos;ll get back to you within one business day.</p>
@@ -123,7 +81,7 @@ function ContactForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate className="card space-y-4 p-6 md:p-8">
+    <form onSubmit={onSubmit} noValidate className="relative space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Name" name="name" autoComplete="name" required error={errors.name} />
         <Field label="Email" name="email" type="email" autoComplete="email" required error={errors.email} />
@@ -178,7 +136,7 @@ function ContactForm() {
           {message}
         </p>
       )}
-      <button type="submit" className="btn btn-primary min-h-13 w-full text-base" disabled={state === "sending"}>
+      <button type="submit" className="btn btn-ghost min-h-13 w-full text-base" disabled={state === "sending"}>
         {state === "sending" ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <Send className="size-4" aria-hidden />}
         {state === "sending" ? "Sending…" : "Send Message"}
       </button>

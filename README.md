@@ -194,7 +194,7 @@ For stronger protection, add Cloudflare Turnstile with `NEXT_PUBLIC_TURNSTILE_SI
 - [ ] `CRON_SECRET` set; cron visible in Vercel → Cron Jobs
 - [ ] Meta Pixel checked with Events Manager → Test events
 - [ ] Privacy policy (`/privacy`) reviewed for your business
-- [ ] Placeholder media replaced with real footage (see below)
+- [ ] Illustrative media replaced with real footage when available (see below)
 
 ---
 
@@ -203,18 +203,19 @@ For stronger protection, add Cloudflare Turnstile with `NEXT_PUBLIC_TURNSTILE_SI
 | What                                                                      | Where                                                            |
 | ------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | Prices, durations, deposit, hours, buffers, service area, policy, contact | `/admin/settings` and `/admin/availability`                      |
-| Headlines, package copy, FAQ, How It Works, benefits                      | [`src/content/site.ts`](src/content/site.ts)                     |
-| Portfolio items                                                           | `portfolio` in `src/content/site.ts`                             |
+| Headlines, package copy, FAQ, How It Works, intro facts                   | [`src/content/site.ts`](src/content/site.ts)                     |
+| Ad landing pages (`/time-lapse`, `/real-estate`)                          | `landing` in `src/content/site.ts`                               |
+| "The Possibilities." showcase (scenes, featured reel)                     | `showcase` in `src/content/site.ts`                              |
 | Hero background video                                                     | `hero.videoSrc` / `hero.mobileVideoSrc` in `src/content/site.ts` |
 
 ### Replacing media
 
-The placeholder images in `/public/media` were cropped from the reference mockup you supplied. They're low resolution, so **replace them with your own footage before launch.**
+The images in `/public/media` are illustrative crops from the reference mockup (`roof-clean.webp` and `estate-frame.webp` are produced by `node scripts/clean-media.mjs`). They're low resolution and labelled "Illustrative imagery" on the site, so **replace them with your own footage when you have it.**
 
-- **Hero video:** use an H.264 MP4 loop of 8–15 seconds, 1080p, under about 4 MB, with no audio track. Host it on a CDN (Supabase Storage, Mux, Cloudflare Stream or Vercel Blob) and set `hero.videoSrc`. The still image renders first, and the video fades in only on fast connections. It's skipped on Data Saver and for reduced-motion users.
+- **Hero video:** use an H.264 MP4 loop of 8–15 seconds, 1080p, under about 4 MB, with no audio track. Host it on a CDN (Supabase Storage, Mux, Cloudflare Stream or Vercel Blob) and set `hero.videoSrc`. The still image renders first, and the video fades in only on fast connections. It's skipped on Data Saver and for reduced-motion users. If it's your own client work, set `hero.mediaNote` to `""`; otherwise keep the label accurate.
 - **Hero still:** replace `public/media/hero-estate.webp`. Use 1920px or wider, as WebP or AVIF.
-- **Package card previews:** set `previewVideo` on each package to a short muted MP4. It loads only while on screen.
-- **Portfolio:** for each item, set `placeholder: false` and choose a `video` source: `{ type: "youtube", id }`, `{ type: "vimeo", id }` or `{ type: "mp4", src }`. Videos load only when someone opens them. Placeholder items are labelled "Sample" so no fake projects are presented as real.
+- **Service visuals:** replace `public/media/roof-clean.webp` (time-lapse) and `public/media/estate-frame.webp` (real estate). Then remove the "Illustrative imagery" note in `src/components/Services.tsx` if they're your own work.
+- **Showcase reel:** set `showcase.video = { src, poster, kind }`. `kind` controls the honesty label: `"client"` (verified Cloudline work, no label), `"illustrative"` (licensed stock), or `"concept"` (AI-generated). Until a reel is set, the section shows an animated flight-plan frame — no fake portfolio entries.
 
 ---
 

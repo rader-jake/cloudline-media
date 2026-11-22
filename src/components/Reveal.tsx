@@ -1,21 +1,26 @@
 "use client";
 
-import { useEffect, useRef, type ElementType, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ElementType, type ReactNode } from "react";
 
-/** Fades/slides children in when scrolled into view. Respects reduced motion via CSS. */
+/**
+ * Fades/slides children in when scrolled into view (one-time). Visibility lives in React state so a
+ * re-render can never drop it. Hidden start state only applies when JS runs (html.js) and is
+ * disabled for reduced motion in CSS.
+ */
 export function Reveal({ children, delay = 0, className = "", as: Tag = "div" }: { children: ReactNode; delay?: number; className?: string; as?: ElementType }) {
   const ref = useRef<HTMLElement>(null);
+  const [visible, setVisible] = useState(false);
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || visible) return;
     if (!("IntersectionObserver" in window)) {
-      el.classList.add("is-visible");
+      setVisible(true);
       return;
     }
     const io = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          el.classList.add("is-visible");
+          setVisible(true);
           io.disconnect();
         }
       },
@@ -23,9 +28,9 @@ export function Reveal({ children, delay = 0, className = "", as: Tag = "div" }:
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [visible]);
   return (
-    <Tag ref={ref} className={`reveal ${className}`} style={{ "--reveal-delay": `${delay}ms` } as React.CSSProperties}>
+    <Tag ref={ref} className={`reveal ${visible ? "is-visible" : ""} ${className}`} style={{ "--reveal-delay": `${delay}ms` } as React.CSSProperties}>
       {children}
     </Tag>
   );

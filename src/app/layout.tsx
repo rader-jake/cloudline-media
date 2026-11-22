@@ -1,11 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Manrope } from "next/font/google";
+import { Archivo, Manrope } from "next/font/google";
 import "./globals.css";
 import { Tracking } from "@/components/Tracking";
 import { SITE_URL } from "@/lib/env";
 import { business } from "@/content/site";
 
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope", display: "swap" });
+// Wide, architectural display face for oversized headlines.
+// "optional": use it only if it arrives in time — no late swap that could shift the wide headline (CLS).
+const archivo = Archivo({ subsets: ["latin"], variable: "--font-archivo", axes: ["wdth"], display: "optional" });
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -29,8 +32,8 @@ export const metadata: Metadata = {
     type: "website",
     url: SITE_URL,
     siteName: "Cloudline Media",
-    title: "Cloudline Media — Elevating Your Projects",
-    description: "Cinematic aerial videos for real estate, construction and service businesses in Queens & Long Island.",
+    title: "Cloudline Media — Your Work. From a Higher Perspective.",
+    description: "Drone films and aerial time-lapses that make your projects impossible to ignore. Queens · Long Island · New York.",
     images: [{ url: "/og.jpg", width: 1200, height: 630, alt: "Cloudline Media" }],
     locale: "en_US",
   },
@@ -65,7 +68,11 @@ const localBusiness = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={manrope.variable}>
+    <html lang="en" className={`${manrope.variable} ${archivo.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Enables reveal animations only when JS runs, so content is never hidden without it. */}
+        <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
+      </head>
       <body className="min-h-dvh font-sans">
         {children}
         <Tracking />

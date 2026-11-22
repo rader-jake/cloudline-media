@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CircleCheck, Clock, HardHat, House, Loader2, Sparkles, TriangleAlert } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarCheck, CircleCheck, Clock, HardHat, House, Loader2, Lock, Sparkles, TriangleAlert } from "lucide-react";
 import { Calendar } from "./Calendar";
 import { DetailsForm } from "./DetailsForm";
 import { SquarePayment } from "./SquarePayment";
@@ -213,27 +213,45 @@ export function BookingWizard({ config }: { config: WizardConfig }) {
   return (
     <div ref={topRef} className="container-x scroll-mt-24">
       <div className="mx-auto max-w-6xl">
-        <header className="mb-6 md:mb-8">
-          <p className="eyebrow">{isQuoteFlow ? "Request a quote" : "Book a shoot"}</p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight md:text-4xl">
-            {step === "service" && "Choose your package"}
+        <header className="mb-8 md:mb-10">
+          <p className="kicker">{isQuoteFlow ? "Request a quote" : "Book a shoot"}</p>
+          <h1 className="display mt-5 text-[clamp(1.9rem,4.6vw,3.4rem)]">
+            {step === "service" && "Choose your shoot"}
             {step === "schedule" && "Pick a date & time"}
-            {step === "details" && "Where & what are we filming?"}
-            {step === "payment" && "Secure your booking"}
-            {step === "quote" && "Interior FPV fly-through quote"}
-            {step === "quote_sent" && "Quote request received"}
+            {step === "details" && "Where are we flying?"}
+            {step === "payment" && "Secure your date"}
+            {step === "quote" && "Interior FPV quote"}
+            {step === "quote_sent" && "Request received"}
           </h1>
-          {!isQuoteFlow && (
-            <ol className="mt-5 grid grid-cols-4 gap-2" aria-label="Booking progress">
-              {BOOK_STEPS.map((s, i) => (
-                <li key={s.key} aria-current={i === stepIndex ? "step" : undefined}>
-                  <div className={`h-1.5 rounded-full transition-colors ${i <= stepIndex ? "bg-accent" : "bg-white/10"}`} />
-                  <p className={`mt-2 hidden text-xs font-semibold sm:block ${i === stepIndex ? "text-white" : "text-mist"}`}>
-                    {i + 1}. {s.label}
-                  </p>
-                </li>
-              ))}
-            </ol>
+          {!isQuoteFlow && stepIndex >= 0 && (
+            <nav aria-label="Booking progress" className="mt-7">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-white/55 sm:hidden">
+                Step {stepIndex + 1} of {BOOK_STEPS.length} · <span className="text-white">{BOOK_STEPS[stepIndex].label}</span>
+              </p>
+              <ol className="flex items-center gap-2 sm:gap-3">
+                {BOOK_STEPS.map((s, i) => {
+                  const done = i < stepIndex;
+                  const current = i === stepIndex;
+                  return (
+                    <li key={s.key} aria-current={current ? "step" : undefined} className="flex flex-1 items-center gap-2 sm:gap-3 last:flex-none">
+                      <span
+                        className={`grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold transition-colors duration-500 ${
+                          done ? "bg-accent text-void" : current ? "border border-accent text-accent shadow-[0_0_0_4px_rgb(32_184_255/0.12)]" : "border border-white/15 text-white/40"
+                        }`}
+                      >
+                        {done ? <CircleCheck className="size-4" aria-label="Completed" /> : i + 1}
+                      </span>
+                      <span className={`hidden whitespace-nowrap text-sm font-semibold sm:block ${current ? "text-white" : done ? "text-white/70" : "text-white/40"}`}>{s.label}</span>
+                      {i < BOOK_STEPS.length - 1 && (
+                        <span aria-hidden className="relative h-px flex-1 overflow-hidden bg-white/12">
+                          <span className={`absolute inset-0 origin-left bg-accent transition-transform duration-700 ${done ? "scale-x-100" : "scale-x-0"}`} />
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+            </nav>
           )}
         </header>
 
@@ -244,7 +262,7 @@ export function BookingWizard({ config }: { config: WizardConfig }) {
         )}
 
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8">
-          <div className="card min-w-0 p-5 md:p-8">
+          <div className="min-w-0 rounded-[1.5rem] border border-line bg-ink/70 p-5 shadow-card backdrop-blur md:p-8">
             {step === "service" && <ServiceStep settings={settings} selected={service} onSelect={chooseService} />}
 
             {step === "schedule" && service && (
@@ -304,6 +322,27 @@ export function BookingWizard({ config }: { config: WizardConfig }) {
                   <PaymentBreakdown total={hold.totalCents} deposit={hold.depositCents} remaining={hold.remainingCents} />
                   <SquarePayment square={config.square} hold={hold} details={details} onResult={onPaymentResult} />
                 </div>
+                <ul className="mt-6 grid gap-3 text-sm text-white/75 sm:grid-cols-3">
+                  {[
+                    [Lock, "Card handled by Square — never stored by us"],
+                    [CircleCheck, `${formatUSD(hold.depositCents)} credited to your ${formatUSD(hold.totalCents)} total`],
+                    [CalendarCheck, "Confirmed instantly once payment is approved"],
+                  ].map(([Icon, t]) => {
+                    const I = Icon as typeof Lock;
+                    return (
+                      <li key={t as string} className="flex items-start gap-2.5 rounded-xl border border-line bg-void/40 p-3.5">
+                        <I className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden /> <span>{t as string}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="mt-4 text-xs text-mist">
+                  By paying you agree to our{" "}
+                  <a href="/policies" target="_blank" rel="noopener" className="underline underline-offset-2 hover:text-white">
+                    deposit &amp; cancellation policy
+                  </a>
+                  .
+                </p>
                 <div className="mt-6 border-t border-line pt-5">
                   <button type="button" onClick={() => setStep("details")} className="inline-flex items-center gap-2 text-sm font-semibold text-mist hover:text-white">
                     <ArrowLeft className="size-4" aria-hidden /> Edit details
@@ -496,7 +535,7 @@ function PaymentBreakdown({ total, deposit, remaining }: { total: number; deposi
         <dd className="text-xl font-extrabold text-accent">{formatUSD(deposit)}</dd>
       </div>
       <div className="flex justify-between p-4">
-        <dt className="text-mist">Remaining balance (due after shoot)</dt>
+        <dt className="text-mist">Remaining balance (due before delivery)</dt>
         <dd className="font-semibold">{formatUSD(remaining)}</dd>
       </div>
     </dl>
