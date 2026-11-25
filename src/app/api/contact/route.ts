@@ -3,6 +3,7 @@ import { db } from "@/lib/supabase/admin";
 import { clientIp, handleError, hashIp, json, rateLimit, verifyTurnstile } from "@/lib/request";
 import { contactFormSchema, fieldErrors } from "@/lib/validation";
 import { contactNotificationEmail, sendEmail } from "@/lib/email";
+import { inquiry } from "@/content/site";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,9 @@ export async function POST(req: Request) {
     return json({ error: "Please check the highlighted fields.", fields: fieldErrors(parsed.error) }, 422);
   }
   const m = parsed.data;
+  // Human-readable summary of what they picked: "The Experience · Wedding venue · Wedding videographer"
+  const label = (list: { value: string; label: string }[], v?: string) => list.find((o) => o.value === v)?.label;
+  const service = [label(inquiry.packages, m.package), label(inquiry.filming, m.industry), m.isVideographer ? "Wedding videographer" : null, m.service].filter(Boolean).join(" · ") || null;
   // Submitted implausibly fast → likely a bot
   if (m.startedAt && Date.now() - m.startedAt < 2500) return json({ ok: true });
   if (!(await verifyTurnstile(m.turnstileToken, ip))) return json({ error: "Spam check failed. Please try again." }, 400);
@@ -36,13 +40,13 @@ export async function POST(req: Request) {
         name: m.name,
         email: m.email,
         phone: m.phone || null,
-        service: m.service ?? null,
+        service: service?.slice(0, 200) ?? null,
         message: m.message,
         ip_hash: ipHash,
       });
       if (error) throw new Error(error.message);
     }
-    const sent = await sendEmail(contactNotificationEmail(m));
+    const sent = await sendEmail(contactNotificationEmail({ ...m, service }));
     if (!client && !sent.sent) return json({ error: "We couldn't send your message. Please email us directly." }, 502);
     return json({ ok: true });
   } catch (e) {

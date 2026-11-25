@@ -6,7 +6,7 @@ import { handleError, json } from "@/lib/request";
 import { loadSettings } from "@/lib/settings-server";
 import { busyRangeFor, isSlotAvailable } from "@/lib/availability";
 import type { BookingRow, BookingStatus } from "@/lib/bookings";
-import { cancelledEmail, needsReschedulingEmail, quoteReadyEmail, rescheduledEmail, sendEmail } from "@/lib/email";
+import { cancelledEmail, locationReviewEmail, needsReschedulingEmail, quoteReadyEmail, rescheduledEmail, sendEmail } from "@/lib/email";
 import { deleteCalendarEvent, upsertCalendarEvent } from "@/lib/google-calendar";
 import { SITE_URL } from "@/lib/env";
 
@@ -50,6 +50,7 @@ const patchSchema = z.discriminatedUnion("action", [
     durationMinutes: z.number().int().min(15).max(720),
     send: z.boolean().default(true),
   }),
+  z.object({ action: z.literal("location_review"), id: z.string().uuid(), value: z.enum(["pending", "approved", "declined"]), notify: z.boolean().default(true) }),
 ]);
 
 export async function PATCH(req: Request) {
@@ -64,6 +65,11 @@ export async function PATCH(req: Request) {
     const { data: b } = await sb.from("bookings").select("*").eq("id", input.id).maybeSingle<BookingRow>();
     if (!b) return json({ error: "Not found" }, 404);
     let emailSent: boolean | null = null;
+
+    if (input.action === "location_review") {
+      await sb.from("bookings").update({ location_review: input.value }).eq("id", b.id);
+      if (input.notify && input.value !== "pending") emailSent = (await sendEmail(locationReviewEmail({ ...b, location_review: input.value }))).sent;
+    }
 
     if (input.action === "notes") {
       await sb.from("bookings").update({ admin_notes: input.notes }).eq("id", b.id);
@@ -128,7 +134,7 @@ export async function PATCH(req: Request) {
     }
 
     if (input.action === "quote") {
-      if (b.package !== "fpv" || !["quote_requested", "quote_sent"].includes(b.status)) return json({ error: "Only open FPV quote requests can be priced." }, 400);
+      if (!b.is_inquiry || !["quote_requested", "quote_sent"].includes(b.status)) return json({ error: "Only open inquiries can be priced." }, 400);
       const patch = { quoted_total_cents: input.quotedTotalCents, duration_minutes: input.durationMinutes, status: "quote_sent" as const };
       await sb.from("bookings").update(patch).eq("id", b.id);
       if (input.send) emailSent = (await sendEmail(quoteReadyEmail({ ...b, ...patch }))).sent;

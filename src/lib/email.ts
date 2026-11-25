@@ -3,6 +3,11 @@ import { env, configured, SITE_URL } from "@/lib/env";
 import { formatUSD } from "@/lib/settings";
 import { prettyDateTime } from "@/lib/time";
 import type { BookingRow } from "@/lib/bookings";
+import { inquiry } from "@/content/site";
+
+const industryLabel = (v: string | null) => (v ? (inquiry.filming.find((o) => o.value === v)?.label ?? v) : "—");
+const LOCATION_REVIEW_NOTE =
+  "Every FPV flight is planned around the location's layout, safety, permissions and regulations. If we find the location can't be filmed safely or legally, we'll offer alternatives or refund your deposit in full.";
 
 // Transactional email via Resend's REST API. If Resend isn't configured we log and
 // return { sent: false } — we never pretend an email was delivered.
@@ -72,6 +77,7 @@ function bookingRows(b: BookingRow): [string, string][] {
     ["Package", b.package_name],
     ["Date & time", b.scheduled_start ? prettyDateTime(b.scheduled_start) : "To be scheduled"],
     ["Shoot address", b.address_formatted ?? ""],
+    ...(b.quoted_total_cents != null ? ([["Total", formatUSD(b.quoted_total_cents)]] as [string, string][]) : []),
     ["Deposit paid", formatUSD(b.deposit_cents)],
     ["Remaining balance", formatUSD(Math.max(0, remaining))],
   ];
@@ -82,14 +88,42 @@ const manageUrl = (b: BookingRow) => `${SITE_URL}/book/confirmed?ref=${b.referen
 /* ─────────────── Messages ─────────────── */
 
 export function confirmationEmail(b: BookingRow) {
-  const heading = "You're booked! Let's elevate your project.";
-  const intro = `Hi ${b.customer_name.split(" ")[0]}, your $${b.deposit_cents / 100} deposit was received and your shoot is confirmed. Here are the details:`;
+  const pendingReview = b.location_review === "pending";
+  const first = b.customer_name.split(" ")[0];
+  const heading = pendingReview ? "Your date is held — flight plan next." : "You're booked! Let's elevate your project.";
+  const intro = pendingReview
+    ? `Hi ${first}, your ${formatUSD(b.deposit_cents)} deposit was received and your date is held. This is a booking request pending location confirmation: we'll review the space for safety and permissions and confirm your flight plan with you before the shoot.`
+    : `Hi ${first}, your ${formatUSD(b.deposit_cents)} deposit was received and your shoot is confirmed. Here are the details:`;
+  const rows = bookingRows(b);
+  const foot = pendingReview ? `${LOCATION_REVIEW_NOTE} ${WEATHER_NOTE}` : WEATHER_NOTE;
+  return {
+    to: b.email,
+    subject: pendingReview ? `Booking request received — ${b.package_name} (${b.reference})` : `Booking confirmed — ${b.package_name} (${b.reference})`,
+    html: layout({
+      preheader: pendingReview ? "Your date is held. We'll confirm your flight plan next." : "Your Cloudline Media shoot is confirmed.",
+      heading,
+      intro,
+      rows,
+      cta: { label: "View booking & add to calendar", href: manageUrl(b) },
+      footnote: foot,
+    }),
+    text: textOf(heading, intro, rows, `${foot}\n\nView booking: ${manageUrl(b)}`),
+  };
+}
+
+export function locationReviewEmail(b: BookingRow) {
+  const approved = b.location_review === "approved";
+  const first = b.customer_name.split(" ")[0];
+  const heading = approved ? "Your flight plan is confirmed" : "Let's talk about your location";
+  const intro = approved
+    ? `Hi ${first}, we've reviewed your location and your FPV shoot is confirmed. We'll be in touch if we need anything before the day.`
+    : `Hi ${first}, after reviewing your location we can't film it safely or legally as planned. We'll contact you about alternatives — or, if you prefer, we'll refund your ${formatUSD(b.deposit_cents)} deposit in full. Just reply to this email.`;
   const rows = bookingRows(b);
   return {
     to: b.email,
-    subject: `Booking confirmed — ${b.package_name} (${b.reference})`,
-    html: layout({ preheader: "Your Cloudline Media shoot is confirmed.", heading, intro, rows, cta: { label: "View booking & add to calendar", href: manageUrl(b) }, footnote: WEATHER_NOTE }),
-    text: textOf(heading, intro, rows, `${WEATHER_NOTE}\n\nView booking: ${manageUrl(b)}`),
+    subject: approved ? `Flight plan confirmed (${b.reference})` : `About your booking location (${b.reference})`,
+    html: layout({ preheader: heading, heading, intro, rows, cta: { label: "View booking", href: manageUrl(b) } }),
+    text: textOf(heading, intro, rows),
   };
 }
 
@@ -147,13 +181,13 @@ export function cancelledEmail(b: BookingRow, reason?: string | null) {
 
 export function quoteReadyEmail(b: BookingRow) {
   const heading = "Your custom quote is ready";
-  const intro = `Hi ${b.customer_name.split(" ")[0]}, thanks for your interest in an interior FPV fly-through. Here's your quote. To lock it in, choose a date and pay the $${b.deposit_cents / 100} deposit — it's credited toward your total.`;
+  const intro = `Hi ${b.customer_name.split(" ")[0]}, thanks for telling us about your project. Here's your quote. To lock it in, choose a date and pay the ${formatUSD(b.deposit_cents)} deposit — it's credited toward your total.`;
   const rows: [string, string][] = [
     ["Package", b.package_name],
     ["Quoted total", formatUSD(b.quoted_total_cents ?? 0)],
     ["Deposit due at booking", formatUSD(b.deposit_cents)],
     ["Remaining after deposit", formatUSD(Math.max(0, (b.quoted_total_cents ?? 0) - b.deposit_cents))],
-    ["Property", b.address_formatted ?? ""],
+    ["Location", b.address_formatted ?? ""],
   ];
   const href = `${SITE_URL}/book?quote=${b.reference}&t=${b.access_token}`;
   return {
@@ -165,15 +199,26 @@ export function quoteReadyEmail(b: BookingRow) {
 }
 
 export function quoteReceivedEmail(b: BookingRow) {
-  const heading = "We got your quote request";
-  const intro = `Hi ${b.customer_name.split(" ")[0]}, thanks for reaching out about an interior FPV fly-through. We'll review your property details and send a custom quote, usually within one business day. No payment has been taken.`;
-  const rows: [string, string][] = [["Reference", b.reference], ["Property", b.address_formatted ?? ""]];
-  return { to: b.email, subject: `Quote request received (${b.reference})`, html: layout({ preheader: "We'll send your quote soon.", heading, intro, rows }), text: textOf(heading, intro, rows) };
+  const heading = "We got your inquiry";
+  const intro = `Hi ${b.customer_name.split(" ")[0]}, thanks for telling us about your project. We'll review the details and reply with a plan and a quote, usually within one business day. No payment has been taken.`;
+  const rows: [string, string][] = [
+    ["Reference", b.reference],
+    ["Package", b.package_name],
+    ["What we're filming", industryLabel(b.industry)],
+    ["Location", b.address_formatted ?? ""],
+    ["Preferred date", b.preferred_dates ?? "—"],
+  ];
+  return { to: b.email, subject: `Inquiry received (${b.reference})`, html: layout({ preheader: "We'll reply with a plan and a quote.", heading, intro, rows }), text: textOf(heading, intro, rows) };
 }
 
 export function teamNotificationEmail(b: BookingRow, kind: "new_booking" | "quote_request") {
-  const heading = kind === "new_booking" ? `New booking: ${b.package_name}` : `New FPV quote request`;
-  const intro = kind === "new_booking" ? `Deposit verified by Square (payment ${b.square_payment_id}).` : "A customer requested an interior FPV quote. Set a price in the admin dashboard to send them a booking link.";
+  const heading = kind === "new_booking" ? `New booking: ${b.package_name}` : `New inquiry: ${b.package_name}`;
+  const intro =
+    kind === "new_booking"
+      ? `Deposit verified by Square (payment ${b.square_payment_id}).${b.location_review === "pending" ? " Location review pending — approve or decline it in admin." : ""}`
+      : "Set a price in the admin dashboard (Quotes) to send them a booking link.";
+  const uses = (b.intended_use ?? []).join(", ");
+  const row = (k: string, v: string | null | undefined | false): [string, string][] => (v ? [[k, v]] : []);
   const rows: [string, string][] = [
     ["Reference", b.reference],
     ["Customer", b.customer_name],
@@ -184,19 +229,24 @@ export function teamNotificationEmail(b: BookingRow, kind: "new_booking" | "quot
     ["When", b.scheduled_start ? prettyDateTime(b.scheduled_start) : b.preferred_dates ?? "—"],
     ["Address", b.address_formatted ?? ""],
     ...(b.outside_service_area ? ([["⚠ Service area", "Outside configured service area"]] as [string, string][]) : []),
-    ["Property type", b.property_type ?? "—"],
-    ["Project", b.project_description ?? "—"],
-    ["Filming requirements", b.filming_requirements ?? "—"],
-    ["Special instructions", b.special_instructions ?? "—"],
+    ["What we're filming", industryLabel(b.industry)],
+    ...row("Tag", b.is_wedding_videographer && "Wedding videographer"),
+    ...row("Property type", b.property_type),
+    ...row("Event", b.event_date && `${b.event_date}${b.expected_attendance ? ` · ${b.expected_attendance} expected` : ""}`),
+    ...row("Instagram/TikTok", b.social_handle),
+    ...row("Space", [b.indoor_outdoor, b.space_size?.replace("_", " ")].filter(Boolean).join(" · ")),
+    ...row("Video use", uses),
+    ["Flight description", b.project_description ?? "—"],
+    ...row("Special instructions", b.special_instructions),
     ["Access notes", b.access_notes ?? "—"],
-    ["FPV add-on interest", b.fpv_interest ? "Yes" : "No"],
-    ["Quoted total", b.quoted_total_cents ? formatUSD(b.quoted_total_cents) : "—"],
+    ...row("FPV add-on interest", b.fpv_interest && "Yes"),
+    ["Total", b.quoted_total_cents ? `${formatUSD(b.quoted_total_cents)}${b.launch_pricing && b.standard_price_cents ? ` (launch pricing; standard ${formatUSD(b.standard_price_cents)})` : ""}` : "—"],
     ["Deposit", kind === "new_booking" ? `${formatUSD(b.deposit_cents)} paid` : "—"],
     ["Source", [b.utm?.utm_source, b.utm?.utm_campaign].filter(Boolean).join(" / ") || "direct"],
   ];
   return {
     to: env.teamEmails,
-    subject: `${kind === "new_booking" ? "✅ New booking" : "📝 Quote request"} — ${b.customer_name} (${b.reference})`,
+    subject: `${kind === "new_booking" ? "✅ New booking" : "📝 New inquiry"} — ${b.customer_name} (${b.reference})`,
     html: layout({ preheader: heading, heading, intro, rows, cta: { label: "Open admin dashboard", href: `${SITE_URL}/admin` } }),
     text: textOf(heading, intro, rows),
     replyTo: b.email,

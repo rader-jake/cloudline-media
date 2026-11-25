@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Logo } from "./Logo";
 import { CookieSettingsLink } from "./Tracking";
 
-export function Footer({ email, phone, areaLabel }: { email: string; phone: string; areaLabel: string }) {
+export function Footer({ email, phone, areaLabel, showTimelapse = true }: { email: string; phone: string; areaLabel: string; showTimelapse?: boolean }) {
   return (
     <footer className="bg-void pb-28 pt-12 md:pb-10">
       <div className="container-x flex flex-col gap-10 md:flex-row md:items-end md:justify-between">
@@ -14,9 +14,10 @@ export function Footer({ email, phone, areaLabel }: { email: string; phone: stri
         </div>
         <nav aria-label="Footer" className="flex flex-wrap gap-x-7 gap-y-3 text-sm text-white/75">
           {[
-            ["/time-lapse", "Time-Lapse"],
-            ["/real-estate", "Real Estate"],
-            ["/#possibilities", "Possibilities"],
+            ["/#packages", "FPV Packages"],
+            ["/#industries", "Industries"],
+            ["/real-estate", "Real Estate Aerial"],
+            ...(showTimelapse ? [["/time-lapse", "Time-Lapse"]] : []),
             ["/#faq", "FAQ"],
             ["/book", "Book"],
           ].map(([href, label]) => (

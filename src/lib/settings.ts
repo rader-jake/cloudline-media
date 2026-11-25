@@ -3,8 +3,13 @@
 // DEFAULT_SETTINGS are only used to fill in missing keys and to render prices on the
 // marketing page before the database is connected — they never create availability.
 
-export type ServiceKey = "timelapse" | "realestate" | "fpv";
-export const SERVICE_KEYS: ServiceKey[] = ["timelapse", "realestate", "fpv"];
+export type ServiceKey = "timelapse" | "realestate" | "fpv" | "flythrough" | "experience" | "production" | "wedding_fpv";
+export const SERVICE_KEYS: ServiceKey[] = ["timelapse", "realestate", "fpv", "flythrough", "experience", "production", "wedding_fpv"];
+/** FPV packages, in display order. `fpv` is the retired interior-FPV quote service (kept for old records). */
+export const FPV_PACKAGE_KEYS = ["flythrough", "experience", "production"] as const satisfies readonly ServiceKey[];
+/** Packages that collect the FPV project fields ("What are we filming?", space, usage…). */
+export const FPV_SERVICES: ServiceKey[] = ["flythrough", "experience", "production", "wedding_fpv", "fpv"];
+export const isFpv = (k: string | null | undefined) => FPV_SERVICES.includes(k as ServiceKey);
 
 export interface ServiceConfig {
   name: string;
@@ -15,6 +20,14 @@ export interface ServiceConfig {
   /** true = customers can self-book & pay deposit. false = "request a quote" flow. */
   selfBookable: boolean;
   active: boolean;
+  /** FPV packages: the planned rate after launch pricing ends (priceCents is the launch rate). */
+  standardPriceCents?: number | null;
+  /** Show the price as "From $X" (scope varies). */
+  startingAt?: boolean;
+  /** Delivery time shown to customers, e.g. "48 hours". Empty = not shown. */
+  turnaround?: string;
+  /** Paid bookings are a request pending a location review (safety, permissions). */
+  requiresLocationReview?: boolean;
 }
 
 export interface WorkingDay {
@@ -54,6 +67,9 @@ export interface Settings {
     approved: boolean;
   };
   contact: { email: string; phone: string };
+  /** Launch pricing: when enabled, FPV packages show the launch rate with the standard rate beneath it. */
+  launch: { enabled: boolean; endsAt: string | null; label: string };
+  display: { showTimelapse: boolean };
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -63,7 +79,11 @@ export const DEFAULT_SETTINGS: Settings = {
   services: {
     timelapse: { name: "Aerial Job Time-Lapse", priceCents: 24900, durationMinutes: 120, selfBookable: true, active: true },
     realestate: { name: "Real Estate Aerial Tour", priceCents: 29900, durationMinutes: 90, selfBookable: true, active: true },
-    fpv: { name: "Interior FPV Fly-Through", priceCents: null, durationMinutes: 120, selfBookable: false, active: true },
+    fpv: { name: "Interior FPV Fly-Through", priceCents: null, durationMinutes: 120, selfBookable: false, active: false },
+    flythrough: { name: "The Fly-Through", priceCents: 34900, standardPriceCents: 49900, durationMinutes: 60, selfBookable: true, active: true, turnaround: "48 hours", requiresLocationReview: true },
+    experience: { name: "The Experience", priceCents: 69900, standardPriceCents: 99900, durationMinutes: 180, selfBookable: true, active: true, turnaround: "48 hours", requiresLocationReview: true },
+    production: { name: "The Production", priceCents: 179900, standardPriceCents: 249900, startingAt: true, durationMinutes: 480, selfBookable: false, active: true, requiresLocationReview: true },
+    wedding_fpv: { name: "Wedding-Day FPV", priceCents: null, durationMinutes: 120, selfBookable: false, active: true, requiresLocationReview: true },
   },
   workingHours: {
     "0": { enabled: false, start: "09:00", end: "17:00" },
@@ -88,10 +108,12 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   policy: {
     // DRAFT — review and approve in /admin/settings before going live.
-    text: "Your $20 deposit reserves your shoot date and time. It is credited toward your total, so it is not an extra fee.\n\nCancel or reschedule 48+ hours ahead: Contact us at least 48 hours before your scheduled start time and we'll refund your deposit in full or move your shoot to a new date at no charge. Refunds go back to your original card and usually appear within 5–10 business days.\n\nLess than 48 hours' notice or no-show: If you cancel within 48 hours of your shoot, or we can't complete it because no one is available or the site isn't accessible at the scheduled time, your deposit is kept to cover the reserved time and travel. No other charge applies.\n\nWeather, airspace & safety: Every flight depends on weather, airspace authorization and on-site safety, and our pilot makes the final call. If conditions prevent the flight, we'll reschedule at no charge. If we can't find a date that works for you, we'll refund your deposit in full.\n\nIf we cancel: If Cloudline Media has to cancel for any other reason, your deposit is refunded in full.\n\nRemaining balance: The remaining balance is due before your final videos are delivered. We'll send you an invoice once editing is complete.",
+    text: "Your $20 deposit reserves your shoot date and time. It is credited toward your total, so it is not an extra fee.\n\nCancel or reschedule 48+ hours ahead: Contact us at least 48 hours before your scheduled start time and we'll refund your deposit in full or move your shoot to a new date at no charge. Refunds go back to your original card and usually appear within 5–10 business days.\n\nLess than 48 hours' notice or no-show: If you cancel within 48 hours of your shoot, or we can't complete it because no one is available or the site isn't accessible at the scheduled time, your deposit is kept to cover the reserved time and travel. No other charge applies.\n\nWeather, airspace & safety: Every flight depends on weather, airspace authorization and on-site safety, and our pilot makes the final call. If conditions prevent the flight, we'll reschedule at no charge. If we can't find a date that works for you, we'll refund your deposit in full.\n\nFPV location review: FPV bookings are a request pending location confirmation. We review every space for layout, safety, permissions and regulations before confirming the flight plan. If we determine the location can't be filmed safely or legally, we'll offer alternatives or refund your deposit in full.\n\nIf we cancel: If Cloudline Media has to cancel for any other reason, your deposit is refunded in full.\n\nRemaining balance: The remaining balance is due before your final videos are delivered. We'll send you an invoice once editing is complete.",
     approved: false,
   },
   contact: { email: "hello@cloudlinemedia.com", phone: "" },
+  launch: { enabled: true, endsAt: null, label: "Launch pricing" },
+  display: { showTimelapse: true },
 };
 
 /** Deep-merge saved settings over defaults so newly added keys always exist. */
@@ -100,15 +122,38 @@ export function mergeSettings(saved: Partial<Settings> | null | undefined): Sett
   return {
     ...DEFAULT_SETTINGS,
     ...s,
-    services: {
-      timelapse: { ...DEFAULT_SETTINGS.services.timelapse, ...s.services?.timelapse },
-      realestate: { ...DEFAULT_SETTINGS.services.realestate, ...s.services?.realestate },
-      fpv: { ...DEFAULT_SETTINGS.services.fpv, ...s.services?.fpv },
-    },
+    services: Object.fromEntries(SERVICE_KEYS.map((k) => [k, { ...DEFAULT_SETTINGS.services[k], ...s.services?.[k] }])) as Settings["services"],
     workingHours: { ...DEFAULT_SETTINGS.workingHours, ...s.workingHours },
     serviceArea: { ...DEFAULT_SETTINGS.serviceArea, ...s.serviceArea },
     policy: { ...DEFAULT_SETTINGS.policy, ...s.policy },
     contact: { ...DEFAULT_SETTINGS.contact, ...s.contact },
+    launch: { ...DEFAULT_SETTINGS.launch, ...s.launch },
+    display: { ...DEFAULT_SETTINGS.display, ...s.display },
+  };
+}
+
+/**
+ * The single source of truth for what a service costs right now. Server routes must use this
+ * (never a client-sent price). Launch on → launch rate; launch off → standard rate (if set).
+ */
+export function effectivePriceCents(s: Pick<Settings, "services" | "launch">, key: ServiceKey): number | null {
+  const svc = s.services[key];
+  if (!s.launch.enabled && svc.standardPriceCents != null) return svc.standardPriceCents;
+  return svc.priceCents;
+}
+
+/** Display data for a price: the big number, and the post-launch standard rate shown beneath it (if any). */
+export function priceDisplay(s: Pick<Settings, "services" | "launch">, key: ServiceKey) {
+  const svc = s.services[key];
+  const price = effectivePriceCents(s, key);
+  const standard = s.launch.enabled && svc.standardPriceCents != null && price != null && svc.standardPriceCents > price ? svc.standardPriceCents : null;
+  return {
+    price,
+    standard,
+    startingAt: Boolean(svc.startingAt),
+    /** e.g. "$349" or "From $1,799" */
+    label: price == null ? null : `${svc.startingAt ? "From " : ""}${formatUSD(price)}`,
+    standardLabel: standard == null ? null : `${svc.startingAt ? "from " : ""}${formatUSD(standard)}`,
   };
 }
 
@@ -122,6 +167,8 @@ export function publicSettings(s: Settings) {
     policy: { text: s.policy.text },
     holdMinutes: s.holdMinutes,
     contact: s.contact,
+    launch: s.launch,
+    display: s.display,
   };
 }
 export type PublicSettings = ReturnType<typeof publicSettings>;

@@ -6,8 +6,8 @@ import { ArrowLeft, ArrowRight, Lock, Menu, X } from "lucide-react";
 import { Logo } from "./Logo";
 
 const links = [
-  { href: "/time-lapse", label: "Time-Lapse" },
-  { href: "/real-estate", label: "Real Estate" },
+  { href: "/#packages", label: "FPV Packages" },
+  { href: "/#industries", label: "Industries" },
   { href: "/#possibilities", label: "Possibilities" },
   { href: "/#how", label: "Process" },
   { href: "/#faq", label: "FAQ" },

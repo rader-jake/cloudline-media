@@ -5,7 +5,19 @@ import { useSettings } from "./useSettings";
 import { Loading, Num, SaveBar } from "./AdminAvailability";
 import type { ServiceKey, Settings } from "@/lib/settings";
 
-const SERVICE_LABELS: Record<ServiceKey, string> = { timelapse: "Aerial Job Time-Lapse", realestate: "Real Estate Aerial Tour", fpv: "Interior FPV (quote only)" };
+const SERVICE_LABELS: Record<ServiceKey, string> = {
+  flythrough: "FPV · The Fly-Through",
+  experience: "FPV · The Experience",
+  production: "FPV · The Production (quote)",
+  wedding_fpv: "FPV · Wedding-Day (quote)",
+  realestate: "Real Estate Aerial Tour",
+  timelapse: "Aerial Job Time-Lapse",
+  fpv: "Interior FPV (retired — old quotes only)",
+};
+/** Packages that have a launch rate + a standard (post-launch) rate. */
+const LAUNCH_PRICED: ServiceKey[] = ["flythrough", "experience", "production"];
+const dollars = (c: number | null | undefined) => (c != null ? c / 100 : "");
+const toCents = (v: string) => (v === "" ? null : Math.round(Number(v) * 100));
 
 export function AdminSettings() {
   const { data, draft, setDraft, error, saving, saved, save } = useSettings();
@@ -46,27 +58,41 @@ export function AdminSettings() {
         <div className="mt-4 space-y-3">
           {(Object.keys(SERVICE_LABELS) as ServiceKey[]).map((k) => {
             const s = draft.services[k];
+            const launchPriced = LAUNCH_PRICED.includes(k);
+            const quoteOnly = k === "fpv" || k === "wedding_fpv";
             return (
-              <div key={k} className="grid gap-3 rounded-xl border border-line bg-ink/40 p-4 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_auto]">
-                <label className="text-sm">
+              <div key={k} className="grid gap-3 rounded-xl border border-line bg-ink/40 p-4 sm:grid-cols-2 lg:grid-cols-4">
+                <label className="text-sm sm:col-span-2 lg:col-span-1">
                   {SERVICE_LABELS[k]} — display name
                   <input className="field mt-1 !min-h-10" value={s.name} onChange={(e) => setSvc(k, { name: e.target.value })} />
                 </label>
-                {k !== "fpv" ? (
+                {k === "fpv" ? (
+                  <div className="text-sm text-mist">Priced per quote</div>
+                ) : (
                   <label className="text-sm">
-                    Starting price ($)
+                    {launchPriced ? "Launch price ($)" : k === "wedding_fpv" ? "Starting price ($) — empty = hidden" : "Starting price ($)"}
+                    <input type="number" min={0} className="field mt-1 !min-h-10" value={dollars(s.priceCents)} onChange={(e) => setSvc(k, { priceCents: toCents(e.target.value) })} />
+                  </label>
+                )}
+                {launchPriced && (
+                  <label className="text-sm">
+                    Standard price after launch ($)
                     <input
                       type="number"
                       min={0}
                       className="field mt-1 !min-h-10"
-                      value={s.priceCents != null ? s.priceCents / 100 : ""}
-                      onChange={(e) => setSvc(k, { priceCents: e.target.value === "" ? null : Math.round(Number(e.target.value) * 100) })}
+                      value={dollars(s.standardPriceCents)}
+                      onChange={(e) => setSvc(k, { standardPriceCents: toCents(e.target.value) })}
                     />
                   </label>
-                ) : (
-                  <div className="text-sm text-mist">Priced per quote</div>
                 )}
-                <Num label={k === "fpv" ? "Default duration (min)" : "Shoot duration (min)"} value={s.durationMinutes} onChange={(v) => setSvc(k, { durationMinutes: v })} />
+                <Num label={quoteOnly || k === "production" ? "Default duration (min)" : "Shoot duration (min)"} value={s.durationMinutes} onChange={(v) => setSvc(k, { durationMinutes: v })} />
+                {(k === "flythrough" || k === "experience") && (
+                  <label className="text-sm">
+                    Turnaround shown to customers
+                    <input className="field mt-1 !min-h-10" placeholder="e.g. 48 hours" value={s.turnaround ?? ""} onChange={(e) => setSvc(k, { turnaround: e.target.value })} />
+                  </label>
+                )}
                 <label className="flex items-end gap-2 pb-2 text-sm">
                   <input type="checkbox" className="size-4 accent-[#20B8FF]" checked={s.active} onChange={(e) => setSvc(k, { active: e.target.checked })} /> Active
                 </label>
@@ -74,6 +100,27 @@ export function AdminSettings() {
             );
           })}
         </div>
+        <div className="mt-6 grid gap-4 rounded-xl border border-accent/25 bg-accent/5 p-4 md:grid-cols-3">
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" className="size-4 accent-[#20B8FF]" checked={draft.launch.enabled} onChange={(e) => set({ launch: { ...draft.launch, enabled: e.target.checked } })} />
+            Launch pricing on
+          </label>
+          <label className="text-sm">
+            Label
+            <input className="field mt-1 !min-h-10" value={draft.launch.label} onChange={(e) => set({ launch: { ...draft.launch, label: e.target.value } })} />
+          </label>
+          <label className="text-sm">
+            Ends on (optional — shown only if set)
+            <input type="date" className="field mt-1 !min-h-10" value={draft.launch.endsAt ?? ""} onChange={(e) => set({ launch: { ...draft.launch, endsAt: e.target.value || null } })} />
+          </label>
+          <p className="text-xs text-mist md:col-span-3">
+            On: FPV packages charge and show the launch price, with the standard price beneath it. Off: they charge and show the standard price.
+          </p>
+        </div>
+        <label className="mt-4 flex items-center gap-2 text-sm">
+          <input type="checkbox" className="size-4 accent-[#20B8FF]" checked={draft.display.showTimelapse} onChange={(e) => set({ display: { showTimelapse: e.target.checked } })} />
+          Show the aerial job time-lapse on the homepage
+        </label>
         <div className="mt-4 max-w-xs">
           <Num label="Deposit ($)" value={draft.depositCents / 100} onChange={(v) => set({ depositCents: Math.round(v * 100) })} />
           <p className="mt-1 text-xs text-mist">Credited toward the service price. Changing this affects new bookings only.</p>

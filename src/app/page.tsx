@@ -1,33 +1,30 @@
 import { Nav } from "@/components/Nav";
 import { Hero } from "@/components/Hero";
-import { Services } from "@/components/Services";
+import { Industries } from "@/components/Industries";
+import { FpvPackages } from "@/components/FpvPackages";
 import { Possibilities } from "@/components/Possibilities";
 import { FinalCta, Intro, Process } from "@/components/Studio";
 import { Faq } from "@/components/Faq";
 import { Footer } from "@/components/Footer";
 import { MobileBookBar } from "@/components/MobileBookBar";
-import { faq } from "@/content/site";
+import { HOME_FAQ, faq } from "@/content/site";
 import { loadSettings } from "@/lib/settings-server";
-import { formatUSD } from "@/lib/settings";
+import { priceDisplay } from "@/lib/settings";
+import { localBusinessJsonLd } from "@/lib/structured-data";
 
 // Prices come from admin settings; refresh at most every minute (and on settings save).
 export const revalidate = 60;
 
-/** Compact homepage FAQ: the questions that most often block a booking. */
-const HOME_FAQ = [
-  "Is the $20 deposit applied to the total?",
-  "What happens if it rains?",
-  "How long does filming take?",
-  "Can I reschedule my shoot?",
-  "Is every location flyable?",
-  "Do you travel outside Queens and Long Island?",
-];
-
+/**
+ * Homepage — 8 sections, each answering one visitor question:
+ * what is this (Hero, Intro) · is it for me (Industries) · what does it cost (Packages) ·
+ * what could it look like (Possibilities) · how do I book (Process, FAQ, Inquiry).
+ */
 export default async function Home() {
   const { settings } = await loadSettings();
-  const tl = settings.services.timelapse.priceCents;
-  const re = settings.services.realestate.priceCents;
-  const priceLine = [tl != null && `Time-lapse from ${formatUSD(tl)}`, re != null && `Aerial films from ${formatUSD(re)}`].filter(Boolean).join("  ·  ");
+  const ft = priceDisplay(settings, "flythrough");
+  const fromLine = ft.price != null ? `FPV fly-throughs from ${ft.label}` : "";
+  const priceLine = [fromLine, settings.launch.enabled && ft.standard != null ? settings.launch.label : ""].filter(Boolean).join(" · ");
 
   return (
     <>
@@ -35,14 +32,16 @@ export default async function Home() {
       <main id="main">
         <Hero priceLine={priceLine} />
         <Intro />
-        <Services settings={settings} />
-        <Possibilities settings={settings} />
+        <Industries />
+        <FpvPackages settings={settings} />
+        <Possibilities />
         <Process />
         <Faq items={faq.filter((f) => HOME_FAQ.includes(f.q))} />
         <FinalCta email={settings.contact.email} phone={settings.contact.phone} />
       </main>
-      <Footer email={settings.contact.email} phone={settings.contact.phone} areaLabel={settings.serviceArea.label} />
-      <MobileBookBar note={priceLine.split("  ·  ")[0]} />
+      <Footer email={settings.contact.email} phone={settings.contact.phone} areaLabel={settings.serviceArea.label} showTimelapse={settings.display.showTimelapse} />
+      <MobileBookBar note={fromLine || undefined} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJsonLd(settings)) }} />
     </>
   );
 }

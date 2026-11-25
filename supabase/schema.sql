@@ -29,7 +29,7 @@ create table if not exists bookings (
   access_token          text not null,                   -- secret for the customer's booking link
   status                booking_status not null default 'pending_payment',
 
-  package               text not null check (package in ('timelapse', 'realestate', 'fpv')),
+  package               text not null,
   package_name          text not null,
 
   customer_name         text not null,
@@ -92,6 +92,7 @@ create table if not exists bookings (
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now(),
 
+  constraint bookings_package_check check (package in ('timelapse', 'realestate', 'fpv', 'flythrough', 'experience', 'production', 'wedding_fpv', 'custom')),
   constraint busy_window_valid check (busy_start is null or busy_end > busy_start)
 );
 
@@ -172,3 +173,30 @@ revoke all on bookings, availability_blocks, settings, contact_messages, webhook
 grant usage on schema public to service_role;
 grant select, insert, update, delete on bookings, availability_blocks, settings, contact_messages, webhook_events to service_role;
 grant usage, select on all sequences in schema public to service_role;
+
+-- ── FPV packages + inquiry fields ──────────────────────────────
+-- Kept in a migration so it also applies to databases created before it existed.
+-- (Same SQL as supabase/migrations/20261124_fpv_packages.sql.)
+alter table bookings
+  add column if not exists is_inquiry              boolean not null default false,  -- started as an inquiry / quote request
+  add column if not exists industry                text,                            -- "What are we filming?"
+  add column if not exists indoor_outdoor          text,
+  add column if not exists space_size              text,
+  add column if not exists intended_use            text[] not null default '{}',
+  add column if not exists social_handle           text,
+  add column if not exists is_wedding_videographer boolean not null default false,
+  add column if not exists event_date              date,
+  add column if not exists expected_attendance     text,
+  add column if not exists location_review         text,                            -- pending | approved | declined
+  add column if not exists standard_price_cents    integer,                         -- post-launch rate shown at booking time
+  add column if not exists launch_pricing          boolean not null default false;  -- launch price applied at booking time
+
+alter table bookings drop constraint if exists bookings_indoor_outdoor_check;
+alter table bookings add constraint bookings_indoor_outdoor_check check (indoor_outdoor is null or indoor_outdoor in ('indoor', 'outdoor', 'both'));
+alter table bookings drop constraint if exists bookings_space_size_check;
+alter table bookings add constraint bookings_space_size_check check (space_size is null or space_size in ('small', 'medium', 'large', 'not_sure'));
+alter table bookings drop constraint if exists bookings_location_review_check;
+alter table bookings add constraint bookings_location_review_check check (location_review is null or location_review in ('pending', 'approved', 'declined'));
+
+
+create index if not exists bookings_inquiry_idx on bookings (is_inquiry, status, created_at desc);

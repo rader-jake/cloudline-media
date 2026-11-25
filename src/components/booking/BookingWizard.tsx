@@ -3,18 +3,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CalendarCheck, CircleCheck, Clock, HardHat, House, Loader2, Lock, Sparkles, TriangleAlert } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarCheck, CircleCheck, Clock, Film, HardHat, House, Loader2, Lock, MessageSquare, Sparkles, TriangleAlert } from "lucide-react";
 import { Calendar } from "./Calendar";
 import { DetailsForm } from "./DetailsForm";
 import { SquarePayment } from "./SquarePayment";
 import { Summary } from "./Summary";
 import { emptyDetails, type Details, type Hold, type QuoteContext, type SelectedSlot, type WizardConfig } from "./types";
 import { addressSchema, contactDetailsSchema, fieldErrors, projectSchema } from "@/lib/validation";
-import { formatUSD, type ServiceKey } from "@/lib/settings";
-import { getAttribution, track, trackOnce } from "@/lib/analytics";
+import { effectivePriceCents, formatUSD, isFpv, priceDisplay, type ServiceKey } from "@/lib/settings";
+import { getAttribution, trackOnce } from "@/lib/analytics";
 import { z } from "zod";
 
-type Step = "service" | "schedule" | "details" | "payment" | "quote" | "quote_sent";
+type Step = "service" | "schedule" | "details" | "payment";
 
 const BOOK_STEPS: { key: Step; label: string }[] = [
   { key: "service", label: "Package" },
@@ -29,7 +29,7 @@ export function BookingWizard({ config }: { config: WizardConfig }) {
   const router = useRouter();
   const { settings } = config;
   const [service, setService] = useState<ServiceKey | null>(config.initialService);
-  const [step, setStep] = useState<Step>(() => (config.initialService === "fpv" ? (config.quote ? "schedule" : "quote") : config.initialService ? "schedule" : "service"));
+  const [step, setStep] = useState<Step>(() => (config.quote || config.initialService ? "schedule" : "service"));
   const [slot, setSlot] = useState<SelectedSlot | null>(null);
   const [details, setDetails] = useState<Details>(emptyDetails);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -39,11 +39,12 @@ export function BookingWizard({ config }: { config: WizardConfig }) {
   const [banner, setBanner] = useState<string | null>(null);
   const [quoteCtx, setQuoteCtx] = useState<QuoteContext | null>(null);
   const [quoteState, setQuoteState] = useState<"loading" | "ok" | "invalid" | null>(config.quote ? "loading" : null);
-  const [preferredDates, setPreferredDates] = useState("");
   const topRef = useRef<HTMLDivElement>(null);
 
   const svc = service ? settings.services[service] : null;
-  const totalCents = quoteCtx?.totalCents ?? svc?.priceCents ?? null;
+  // Display only — the server prices every booking itself from admin settings.
+  const totalCents = quoteCtx?.totalCents ?? (service ? effectivePriceCents(settings, service) : null);
+  const needsLocationReview = Boolean(svc?.requiresLocationReview);
 
   /* ── Quote links: load the priced quote + prefill ────────────── */
   useEffect(() => {
@@ -59,6 +60,7 @@ export function BookingWizard({ config }: { config: WizardConfig }) {
         }
         if (!data.booking.quotedTotalCents || !data.prefill) return setQuoteState("invalid");
         setQuoteCtx({ reference: data.booking.reference, token: config.quote!.token, totalCents: data.booking.quotedTotalCents, packageName: data.booking.packageName });
+        setService(data.booking.packageKey as ServiceKey);
         setDetails((d) => ({ ...d, ...data.prefill, address: { ...d.address, ...data.prefill.address }, project: { ...d.project, ...data.prefill.project } }));
         setQuoteState("ok");
       } catch {
@@ -69,10 +71,10 @@ export function BookingWizard({ config }: { config: WizardConfig }) {
 
   /* ── Analytics ───────────────────────────────────────────────── */
   useEffect(() => {
-    if (service && service !== "fpv") {
+    if (service && (settings.services[service].selfBookable || config.quote)) {
       trackOnce("initiate", "InitiateCheckout", { content_ids: [service], content_name: settings.services[service].name, value: settings.depositCents / 100, currency: "USD", num_items: 1 });
     }
-  }, [service, settings]);
+  }, [service, settings, config.quote]);
   useEffect(() => {
     if (step === "payment") trackOnce("addpayment", "AddPaymentInfo", { content_ids: [service], value: settings.depositCents / 100, currency: "USD" });
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -82,13 +84,14 @@ export function BookingWizard({ config }: { config: WizardConfig }) {
   const chooseService = (s: ServiceKey) => {
     setService(s);
     setSlot(null);
-    setStep(s === "fpv" ? "quote" : "schedule");
+    setStep("schedule");
   };
 
   const validateDetails = useCallback(() => {
     const parsed = detailsSchema.safeParse(details);
     const errs = parsed.success ? {} : fieldErrors(parsed.error);
     if (service === "timelapse" && !details.project.description.trim()) errs["project.description"] = "Briefly describe the work we're filming";
+    if (isFpv(service) && !details.project.industry) errs["project.industry"] = "Tell us what we're filming";
     setErrors(errs);
     if (Object.keys(errs).length) {
       const first = document.getElementById(Object.keys(errs)[0]);
@@ -145,32 +148,6 @@ export function BookingWizard({ config }: { config: WizardConfig }) {
     }
   }
 
-  async function submitQuote() {
-    const data = validateDetails();
-    if (!data) return;
-    setBusy(true);
-    setBanner(null);
-    try {
-      const res = await fetch("/api/bookings/quote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, preferredDates, attribution: getAttribution() }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        if (json.fields) setErrors(json.fields);
-        setBanner(json.error ?? "Something went wrong. Please try again.");
-        return;
-      }
-      track("Lead", { content_name: "Interior FPV quote" });
-      setStep("quote_sent");
-    } catch {
-      setBanner("Network error — please try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   const onPaymentResult = (r: Parameters<React.ComponentProps<typeof SquarePayment>["onResult"]>[0]) => {
     if (r.status === "expired") {
       setHold(null);
@@ -184,7 +161,6 @@ export function BookingWizard({ config }: { config: WizardConfig }) {
 
   /* ── Render ──────────────────────────────────────────────────── */
   const stepIndex = BOOK_STEPS.findIndex((s) => s.key === step);
-  const isQuoteFlow = step === "quote" || step === "quote_sent";
   const outsideArea = useMemo(() => {
     const zip = details.address.zip.trim();
     return zip.length >= 5 && settings.serviceArea.zipPrefixes.length > 0 && !settings.serviceArea.zipPrefixes.includes(zip.slice(0, 3));
@@ -214,16 +190,14 @@ export function BookingWizard({ config }: { config: WizardConfig }) {
     <div ref={topRef} className="container-x scroll-mt-24">
       <div className="mx-auto max-w-6xl">
         <header className="mb-8 md:mb-10">
-          <p className="kicker">{isQuoteFlow ? "Request a quote" : "Book a shoot"}</p>
+          <p className="kicker">{quoteCtx ? "Book your quote" : "Book a shoot"}</p>
           <h1 className="display mt-5 text-[clamp(1.9rem,4.6vw,3.4rem)]">
             {step === "service" && "Choose your shoot"}
             {step === "schedule" && "Pick a date & time"}
             {step === "details" && "Where are we flying?"}
             {step === "payment" && "Secure your date"}
-            {step === "quote" && "Interior FPV quote"}
-            {step === "quote_sent" && "Request received"}
           </h1>
-          {!isQuoteFlow && stepIndex >= 0 && (
+          {stepIndex >= 0 && (
             <nav aria-label="Booking progress" className="mt-7">
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-white/55 sm:hidden">
                 Step {stepIndex + 1} of {BOOK_STEPS.length} · <span className="text-white">{BOOK_STEPS[stepIndex].label}</span>
@@ -326,7 +300,7 @@ export function BookingWizard({ config }: { config: WizardConfig }) {
                   {[
                     [Lock, "Card handled by Square — never stored by us"],
                     [CircleCheck, `${formatUSD(hold.depositCents)} credited to your ${formatUSD(hold.totalCents)} total`],
-                    [CalendarCheck, "Confirmed instantly once payment is approved"],
+                    [CalendarCheck, needsLocationReview ? "Date held instantly — flight plan confirmed after our location review" : "Confirmed instantly once payment is approved"],
                   ].map(([Icon, t]) => {
                     const I = Icon as typeof Lock;
                     return (
@@ -336,6 +310,12 @@ export function BookingWizard({ config }: { config: WizardConfig }) {
                     );
                   })}
                 </ul>
+                {needsLocationReview && (
+                  <p className="mt-4 rounded-xl border border-accent/25 bg-accent/5 p-4 text-sm leading-relaxed text-white/85">
+                    This is a <strong>booking request pending location confirmation</strong>. Your deposit holds the date while we review the space for safety and
+                    permissions. If it can&apos;t be filmed safely or legally, we&apos;ll offer alternatives or refund your deposit in full.
+                  </p>
+                )}
                 <p className="mt-4 text-xs text-mist">
                   By paying you agree to our{" "}
                   <a href="/policies" target="_blank" rel="noopener" className="underline underline-offset-2 hover:text-white">
@@ -351,51 +331,15 @@ export function BookingWizard({ config }: { config: WizardConfig }) {
               </>
             )}
 
-            {step === "quote" && (
-              <>
-                <div className="mb-8 rounded-xl border border-accent/25 bg-accent/5 p-4 text-sm leading-relaxed text-white/85">
-                  <p className="flex items-center gap-2 font-bold text-white">
-                    <Sparkles className="size-4 text-accent" aria-hidden /> How FPV quotes work
-                  </p>
-                  <p className="mt-1">
-                    Interior fly-throughs are priced by property size and layout. Send us the details below — no payment today. We&apos;ll email your quote with a
-                    link to pick a date and pay the {formatUSD(settings.depositCents)} deposit, which is credited to your total.
-                  </p>
-                </div>
-                <DetailsForm value={details} onChange={setDetails} errors={errors} service="fpv" googleMapsKey={config.googleMapsKey} />
-                <div className="mt-6">
-                  <label htmlFor="preferredDates" className="mb-1.5 block text-sm font-semibold">
-                    Preferred dates <span className="font-normal text-mist">(optional)</span>
-                  </label>
-                  <input id="preferredDates" className="field" placeholder="e.g. Weekday mornings the week of Dec 8" value={preferredDates} onChange={(e) => setPreferredDates(e.target.value)} />
-                </div>
-                <StepNav onBack={() => setStep("service")} backLabel="Change package" onNext={submitQuote} nextLabel="Request my quote" busy={busy} />
-              </>
-            )}
-
-            {step === "quote_sent" && (
-              <div className="py-8 text-center">
-                <CircleCheck className="mx-auto size-14 text-success" aria-hidden />
-                <p className="mt-4 text-2xl font-bold">Thanks — we&apos;ll be in touch soon.</p>
-                <p className="mx-auto mt-2 max-w-md text-mist">
-                  We&apos;ll review your property details and email a custom quote to <span className="text-white">{details.contact.email}</span>, usually within
-                  one business day. No payment has been taken.
-                </p>
-                <Link href="/" className="btn btn-ghost mt-8">
-                  Back to home
-                </Link>
-              </div>
-            )}
           </div>
 
-          {step !== "service" && step !== "quote_sent" && service && (
+          {step !== "service" && service && (
             <Summary
               packageName={quoteCtx?.packageName ?? svc?.name ?? ""}
               totalCents={totalCents}
               depositCents={settings.depositCents}
               slot={slot}
               address={details.address}
-              quoteFlow={step === "quote"}
             />
           )}
         </div>
@@ -408,56 +352,59 @@ export function BookingWizard({ config }: { config: WizardConfig }) {
 
 function ServiceStep({ settings, selected, onSelect }: { settings: WizardConfig["settings"]; selected: ServiceKey | null; onSelect: (s: ServiceKey) => void }) {
   const options: { key: ServiceKey; Icon: typeof HardHat; blurb: string }[] = [
-    { key: "timelapse", Icon: HardHat, blurb: "Up to 2 hours of on-site coverage, edited into a 20–45s cinematic time-lapse." },
-    { key: "realestate", Icon: House, blurb: "Exterior aerial tour with a 30–60s edited video + vertical social cut." },
-    { key: "fpv", Icon: Sparkles, blurb: "Immersive indoor drone fly-through. Priced per property — request a quote." },
+    { key: "flythrough", Icon: Sparkles, blurb: "One planned FPV flight through your space. A 15–30s vertical film." },
+    { key: "experience", Icon: Film, blurb: "Multiple FPV sequences, a 45–60s film plus social cutdowns." },
+    { key: "production", Icon: MessageSquare, blurb: "Full production day for brands and resorts — planned with you first." },
+    { key: "wedding_fpv", Icon: MessageSquare, blurb: "Planned FPV moments for your wedding film — quoted per event." },
+    { key: "realestate", Icon: House, blurb: "Exterior aerial tour with a 30–60s edited video + vertical cut." },
+    { key: "timelapse", Icon: HardHat, blurb: "Up to 2 hours on site, edited into a 20–45s aerial time-lapse." },
   ];
+  const visible = options.filter((o) => settings.services[o.key].active && (o.key !== "timelapse" || settings.display.showTimelapse));
   return (
     <div className="grid gap-3" role="radiogroup" aria-label="Packages">
-      {options
-        .filter((o) => settings.services[o.key].active)
-        .map(({ key, Icon, blurb }) => {
-          const s = settings.services[key];
-          const sel = selected === key;
-          return (
-            <button
-              key={key}
-              type="button"
-              role="radio"
-              aria-checked={sel}
-              onClick={() => onSelect(key)}
-              className={`group flex items-center gap-4 rounded-2xl border p-4 text-left sm:p-5 transition ${sel ? "border-accent bg-accent/10" : "border-line bg-ink/30 hover:border-accent/60"}`}
-            >
-              <span className="grid size-10 shrink-0 place-items-center self-start rounded-xl bg-accent/10 sm:size-12 sm:self-center">
-                <Icon className="size-5 text-accent sm:size-6" strokeWidth={1.6} aria-hidden />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-lg font-bold leading-snug">{s.name}</span>
-                <span className="mt-0.5 block text-sm text-mist">{blurb}</span>
-                <span className="mt-2 block sm:hidden">{s.priceCents != null && s.selfBookable ? (
-                  <>
-                    <span className="text-xs text-mist sm:block">Starting at </span>
-                    <span className="text-lg font-extrabold sm:block sm:text-xl">{formatUSD(s.priceCents)}</span>
-                  </>
-                ) : (
-                  <span className="text-sm font-bold text-accent sm:block">Request a Quote</span>
-                )}</span>
-              </span>
-              <span className="hidden shrink-0 text-right sm:block">
-                {s.priceCents != null && s.selfBookable ? (
-                  <>
-                    <span className="text-xs text-mist sm:block">Starting at </span>
-                    <span className="text-lg font-extrabold sm:block sm:text-xl">{formatUSD(s.priceCents)}</span>
-                  </>
-                ) : (
-                  <span className="text-sm font-bold text-accent sm:block">Request a Quote</span>
-                )}
-              </span>
-              <ArrowRight className="hidden size-5 shrink-0 text-accent transition group-hover:translate-x-1 sm:block" aria-hidden />
-            </button>
-          );
-        })}
-      <p className="mt-2 text-center text-sm text-mist">A {formatUSD(settings.depositCents)} deposit secures your date and is credited toward your total.</p>
+      {visible.map(({ key, Icon, blurb }) => {
+        const s = settings.services[key];
+        const pd = priceDisplay(settings, key);
+        const bookable = s.selfBookable && pd.price != null;
+        const sel = selected === key;
+        const price = (
+          <>
+            {bookable || pd.label ? (
+              <>
+                <span className="block text-xs text-mist">{pd.standard != null ? settings.launch.label : pd.startingAt ? "Starting at" : "Price"}</span>
+                <span className="block text-lg font-extrabold sm:text-xl">{pd.label}</span>
+              </>
+            ) : null}
+            {!bookable && <span className="block text-sm font-bold text-accent">Plan it with us</span>}
+          </>
+        );
+        const cls = `group flex items-center gap-4 rounded-2xl border p-4 text-left transition sm:p-5 ${sel ? "border-accent bg-accent/10" : "border-line bg-ink/30 hover:border-accent/60"}`;
+        const body = (
+          <>
+            <span className="grid size-10 shrink-0 place-items-center self-start rounded-xl bg-accent/10 sm:size-12 sm:self-center">
+              <Icon className="size-5 text-accent sm:size-6" strokeWidth={1.6} aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-lg font-bold leading-snug">{s.name}</span>
+              <span className="mt-0.5 block text-sm text-mist">{blurb}</span>
+              <span className="mt-2 block sm:hidden">{price}</span>
+            </span>
+            <span className="hidden shrink-0 text-right sm:block">{price}</span>
+            <ArrowRight className="hidden size-5 shrink-0 text-accent transition group-hover:translate-x-1 sm:block" aria-hidden />
+          </>
+        );
+        // Production / Wedding-Day FPV: inquiry first, no payment until a quote is sent.
+        return bookable ? (
+          <button key={key} type="button" role="radio" aria-checked={sel} onClick={() => onSelect(key)} className={cls}>
+            {body}
+          </button>
+        ) : (
+          <Link key={key} href={`/?package=${key}#contact`} className={cls}>
+            {body}
+          </Link>
+        );
+      })}
+      <p className="mt-2 text-center text-sm text-mist">A {formatUSD(settings.depositCents)} deposit holds your date and is credited toward your total.</p>
     </div>
   );
 }

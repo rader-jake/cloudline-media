@@ -1,32 +1,37 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+
+type Sources = { mp4: string; webm?: string; mobileMp4?: string };
 
 /**
- * Background video that only loads after the page is interactive, skips on Data Saver /
- * slow connections and reduced-motion, and fades in over the poster once it can play.
+ * Muted background loop layered over the poster still. It only loads after the page is interactive,
+ * never for reduced-motion users, Data Saver or 2G (they keep the still), and fades in once it can play.
+ * Phones get the portrait-cropped 720p file.
  */
-export function HeroVideo({ src, mobileSrc, poster }: { src: string; mobileSrc?: string; poster: string }) {
-  const ref = useRef<HTMLVideoElement>(null);
-  const [source, setSource] = useState<string | null>(null);
+export function HeroVideo({ sources, poster, posterMobile }: { sources: Sources; poster: string; posterMobile?: string }) {
+  const [pick, setPick] = useState<{ list: { src: string; type: string }[]; poster: string } | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
     if (conn?.saveData || /(^|-)2g$/.test(conn?.effectiveType ?? "")) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const isMobile = window.matchMedia("(max-width: 767px)").matches;
-    const id = window.setTimeout(() => setSource(isMobile && mobileSrc ? mobileSrc : src), 300);
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (reduce.matches) return;
+    const mobile = window.matchMedia("(max-width: 767px)").matches;
+    const list =
+      mobile && sources.mobileMp4
+        ? [{ src: sources.mobileMp4, type: "video/mp4" }]
+        : [...(sources.webm ? [{ src: sources.webm, type: "video/webm" }] : []), { src: sources.mp4, type: "video/mp4" }];
+    const id = window.setTimeout(() => setPick({ list, poster: mobile && posterMobile ? posterMobile : poster }), 250);
     return () => window.clearTimeout(id);
-  }, [src, mobileSrc]);
+  }, [sources.mp4, sources.webm, sources.mobileMp4, poster, posterMobile]);
 
-  if (!source) return null;
+  if (!pick) return null;
   return (
     <video
-      ref={ref}
       className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ${ready ? "opacity-100" : "opacity-0"}`}
-      src={source}
-      poster={poster}
+      poster={pick.poster}
       autoPlay
       muted
       loop
@@ -34,7 +39,11 @@ export function HeroVideo({ src, mobileSrc, poster }: { src: string; mobileSrc?:
       preload="auto"
       aria-hidden
       onCanPlay={() => setReady(true)}
-      onError={() => setSource(null)}
-    />
+      onError={() => setPick(null)}
+    >
+      {pick.list.map((s) => (
+        <source key={s.src} src={s.src} type={s.type} />
+      ))}
+    </video>
   );
 }

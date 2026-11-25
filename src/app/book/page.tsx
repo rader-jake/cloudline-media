@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { Nav } from "@/components/Nav";
 import { BookingWizard } from "@/components/booking/BookingWizard";
 import { loadSettings } from "@/lib/settings-server";
@@ -17,6 +18,10 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
   const { settings } = await loadSettings();
   const pkg = sp.package as ServiceKey | undefined;
   const quote = sp.quote && sp.t ? { reference: sp.quote, token: sp.t } : null;
+  // Quote-only packages (and the retired interior-FPV link) start with an inquiry, not a deposit.
+  if (!quote && pkg && SERVICE_KEYS.includes(pkg) && !settings.services[pkg].selfBookable) {
+    redirect(`/?package=${pkg === "fpv" ? "flythrough" : pkg}#contact`);
+  }
 
   return (
     <>
@@ -25,7 +30,8 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
         <BookingWizard
           config={{
             settings: publicSettings(settings),
-            initialService: quote ? "fpv" : pkg && SERVICE_KEYS.includes(pkg) ? pkg : null,
+            // With a quote link the wizard takes the package from the quote itself.
+            initialService: quote ? null : pkg && SERVICE_KEYS.includes(pkg) && settings.services[pkg].active ? pkg : null,
             quote,
             ready: { database: configured.database(), payments: configured.square() },
             square: { appId: env.squareAppId ?? "", locationId: env.squareLocationId ?? "", env: env.squareEnv },

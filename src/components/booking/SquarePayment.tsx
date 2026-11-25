@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { useEffect, useRef, useState } from "react";
 import { CreditCard, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { formatUSD } from "@/lib/settings";

@@ -15,13 +15,26 @@ const service = z.object({
   durationMinutes: z.number().int().min(15).max(720),
   selfBookable: z.boolean(),
   active: z.boolean(),
+  standardPriceCents: z.number().int().min(0).max(10_000_000).nullable().optional(),
+  startingAt: z.boolean().optional(),
+  turnaround: z.string().max(60).optional(),
+  requiresLocationReview: z.boolean().optional(),
 });
+const quoteOnly = service.extend({ selfBookable: z.literal(false) });
 
 const settingsSchema = z.object({
   onlineBookingEnabled: z.boolean(),
   timezone: z.literal("America/New_York"),
   depositCents: z.number().int().min(100).max(100_000),
-  services: z.object({ timelapse: service, realestate: service, fpv: service.extend({ selfBookable: z.literal(false) }) }),
+  services: z.object({
+    timelapse: service,
+    realestate: service,
+    fpv: quoteOnly,
+    flythrough: service,
+    experience: service,
+    production: quoteOnly,
+    wedding_fpv: quoteOnly,
+  }),
   workingHours: z.record(z.enum(["0", "1", "2", "3", "4", "5", "6"]), z.object({ enabled: z.boolean(), start: hhmm, end: hhmm })),
   slotIntervalMinutes: z.number().int().min(15).max(240),
   minNoticeHours: z.number().int().min(0).max(24 * 30),
@@ -37,6 +50,8 @@ const settingsSchema = z.object({
   }),
   policy: z.object({ text: z.string().min(20).max(4000), approved: z.boolean() }),
   contact: z.object({ email: z.string().email().or(z.literal("")), phone: z.string().max(30) }),
+  launch: z.object({ enabled: z.boolean(), endsAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(), label: z.string().min(2).max(40) }),
+  display: z.object({ showTimelapse: z.boolean() }),
 });
 
 export async function GET() {

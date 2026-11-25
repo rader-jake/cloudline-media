@@ -84,6 +84,7 @@ export function Confirmation({ initial, reference, token }: { initial: PublicBoo
   }
 
   const needsReschedule = b.status === "needs_rescheduling";
+  const pendingReview = b.locationReview === "pending";
   const cal =
     b.scheduledStart && b.scheduledEnd
       ? {
@@ -103,7 +104,13 @@ export function Confirmation({ initial, reference, token }: { initial: PublicBoo
           <CircleCheck className="size-11 text-success" aria-hidden />
         </div>
         <h1 className="mt-6 text-3xl font-extrabold tracking-tight md:text-5xl">
-          {needsReschedule ? "Deposit received — let's find a new time." : (
+          {needsReschedule ? (
+            "Deposit received — let's find a new time."
+          ) : pendingReview ? (
+            <>
+              Your date is held. <span className="text-accent">Flight plan next.</span>
+            </>
+          ) : (
             <>
               You&apos;re Booked! <span className="text-accent">Let&apos;s Elevate Your Project.</span>
             </>
@@ -120,6 +127,12 @@ export function Confirmation({ initial, reference, token }: { initial: PublicBoo
                     : `Please save your booking reference below — we'll follow up at ${b.email}.`
               }`}
         </p>
+        {pendingReview && !needsReschedule && (
+          <p className="mx-auto mt-4 max-w-xl rounded-xl border border-accent/25 bg-accent/5 p-4 text-sm leading-relaxed text-white/85">
+            This is a booking request pending location confirmation. We&apos;ll review the space for safety and permissions and confirm your flight plan. If it
+            can&apos;t be filmed safely or legally, we&apos;ll offer alternatives or refund your deposit in full.
+          </p>
+        )}
       </div>
 
       <div className="card mt-10 overflow-hidden">

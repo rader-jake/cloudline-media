@@ -1,7 +1,8 @@
 import { configured } from "@/lib/env";
 import { loadSettings } from "@/lib/settings-server";
 import { busyRangeFor, isSlotAvailable } from "@/lib/availability";
-import { generateAccessToken, generateReference, releaseExpiredHolds, type BookingRow } from "@/lib/bookings";
+import { generateAccessToken, generateReference, projectColumns, releaseExpiredHolds, type BookingRow } from "@/lib/bookings";
+import { effectivePriceCents, isFpv } from "@/lib/settings";
 import { requireDb } from "@/lib/supabase/admin";
 import { clientIp, handleError, hashIp, json, rateLimit } from "@/lib/request";
 import { fieldErrors, formatAddress, formatPhone, holdRequestSchema } from "@/lib/validation";
@@ -33,20 +34,25 @@ export async function POST(req: Request) {
 
     const svc = settings.services[input.service];
     let quoteRow: BookingRow | null = null;
-    let total = svc.priceCents;
+    // Server-side price only — never trust a client-sent amount.
+    let total = effectivePriceCents(settings, input.service);
     let duration = svc.durationMinutes;
 
-    if (input.service === "fpv") {
-      if (!input.quote) return json({ error: "Interior FPV fly-throughs are quoted individually. Please request a quote." }, 400);
+    if (input.quote) {
+      // Booking from a priced inquiry/quote link (any package).
       const { data } = await sb.from("bookings").select("*").eq("reference", input.quote.reference).maybeSingle<BookingRow>();
       if (!data || !safeEqual(data.access_token, input.quote.token) || !["quote_sent", "pending_payment"].includes(data.status) || data.deposit_status === "paid")
         return json({ error: "This quote link is invalid or has already been used." }, 403);
+      if (data.package !== input.service) return json({ error: "This quote is for a different package." }, 400);
       if (!data.quoted_total_cents) return json({ error: "This quote hasn't been priced yet." }, 400);
       quoteRow = data;
       total = data.quoted_total_cents;
       duration = data.duration_minutes ?? duration;
-    } else if (!svc.active || !svc.selfBookable || svc.priceCents == null) {
-      return json({ error: "This service isn't available for online booking right now." }, 400);
+    } else if (!svc.active || !svc.selfBookable || total == null) {
+      return json({ error: "This package is planned with you first. Please send us an inquiry and we'll reply with a quote.", code: "inquiry_only" }, 400);
+    }
+    if (isFpv(input.service) && !input.project.industry && !quoteRow?.industry) {
+      return json({ error: "Please check the highlighted fields.", fields: { "project.industry": "Tell us what we're filming" } }, 422);
     }
 
     // Service area
@@ -98,13 +104,12 @@ export async function POST(req: Request) {
       address_lng: a.lng ?? null,
       address_verified: Boolean(a.placeId),
       outside_service_area: outside,
-      property_type: input.project.propertyType ?? null,
-      project_description: input.project.description ?? quoteRow?.project_description ?? null,
-      filming_requirements: input.project.filmingRequirements ?? null,
-      special_instructions: input.project.specialInstructions ?? null,
-      access_notes: input.project.accessNotes ?? null,
-      fpv_interest: input.project.fpvInterest ?? false,
+      ...projectColumns({ ...input.project, description: input.project.description ?? quoteRow?.project_description ?? undefined, industry: input.project.industry ?? quoteRow?.industry ?? undefined }),
       quoted_total_cents: total,
+      // Snapshot of the pricing shown at booking time (launch vs standard).
+      standard_price_cents: quoteRow ? quoteRow.standard_price_cents : (svc.standardPriceCents ?? null),
+      launch_pricing: quoteRow ? quoteRow.launch_pricing : Boolean(settings.launch.enabled && svc.standardPriceCents != null),
+      location_review: svc.requiresLocationReview ? ("pending" as const) : null,
       deposit_cents: settings.depositCents,
       deposit_status: "unpaid" as const,
       scheduled_start: start.toISOString(),

@@ -202,20 +202,22 @@ For stronger protection, add Cloudflare Turnstile with `NEXT_PUBLIC_TURNSTILE_SI
 
 | What                                                                      | Where                                                            |
 | ------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Prices, durations, deposit, hours, buffers, service area, policy, contact | `/admin/settings` and `/admin/availability`                      |
-| Headlines, package copy, FAQ, How It Works, intro facts                   | [`src/content/site.ts`](src/content/site.ts)                     |
+| Prices (launch + standard), durations, turnaround, deposit, launch pricing on/off, show time-lapse, hours, service area, policy, contact | `/admin/settings` and `/admin/availability` (defaults in [`src/lib/settings.ts`](src/lib/settings.ts)) |
+| Hero, FPV difference, industries, packages copy, inquiry options, How It Works, FAQ | [`src/content/site.ts`](src/content/site.ts) |
 | Ad landing pages (`/time-lapse`, `/real-estate`)                          | `landing` in `src/content/site.ts`                               |
-| "The Possibilities." showcase (scenes, featured reel)                     | `showcase` in `src/content/site.ts`                              |
-| Hero background video                                                     | `hero.videoSrc` / `hero.mobileVideoSrc` in `src/content/site.ts` |
+| "Imagine the possibilities" showcase (titles, future videos)              | `showcase.items` in `src/content/site.ts`                        |
+
+**Pricing.** Every price the site shows and the booking server charges comes from admin → Settings. FPV packages have a *launch price* and a *standard price after launch*. With **Launch pricing on**, the launch price is charged and the standard rate is shown beneath it; switch it **off** and the standard price is charged and shown. Set an end date only if you want one displayed.
 
 ### Replacing media
 
-The images in `/public/media` are illustrative crops from the reference mockup (`roof-clean.webp` and `estate-frame.webp` are produced by `node scripts/clean-media.mjs`). They're low resolution and labelled "Illustrative imagery" on the site, so **replace them with your own footage when you have it.**
+All current imagery is labelled on the site: the hero loop and the FPV/industry frames are **AI-generated ("Concept visualization")**; the older aerial images are **"Illustrative imagery"**. Never remove a label unless the media is Cloudline's own footage.
 
-- **Hero video:** use an H.264 MP4 loop of 8–15 seconds, 1080p, under about 4 MB, with no audio track. Host it on a CDN (Supabase Storage, Mux, Cloudflare Stream or Vercel Blob) and set `hero.videoSrc`. The still image renders first, and the video fades in only on fast connections. It's skipped on Data Saver and for reduced-motion users. If it's your own client work, set `hero.mediaNote` to `""`; otherwise keep the label accurate.
-- **Hero still:** replace `public/media/hero-estate.webp`. Use 1920px or wider, as WebP or AVIF.
-- **Service visuals:** replace `public/media/roof-clean.webp` (time-lapse) and `public/media/estate-frame.webp` (real estate). Then remove the "Illustrative imagery" note in `src/components/Services.tsx` if they're your own work.
-- **Showcase reel:** set `showcase.video = { src, poster, kind }`. `kind` controls the honesty label: `"client"` (verified Cloudline work, no label), `"illustrative"` (licensed stock), or `"concept"` (AI-generated). Until a reel is set, the section shows an animated flight-plan frame — no fake portfolio entries.
+- **Hero loop:** `public/media/hero/` holds `hero-fpv.mp4` (H.264, ≤3 MB), `hero-fpv.webm`, `hero-fpv-mobile.mp4` (9:16 portrait) and the two first-frame posters. Re-encode a new clip with `FFMPEG=/path/to/ffmpeg bash scripts/encode-hero.sh input.mp4 [start] [seconds]`. The caption is `hero.mediaNote` in `src/content/site.ts`. Set it to `""` only for your own footage. The original source is kept out of the deploy in `assets-src/` (git-ignored).
+- **Industry tiles:** set `image` on each item in `industries.items` (1600×1000 or larger, WebP, subject centred). Tiles without an image show a designed backdrop.
+- **Package visuals:** `image` on each item in `fpvPackages.items` (1600×900+, WebP).
+- **Showcase videos:** add `poster` + `videoUrl` to an item in `showcase.items`. Keep `isIllustrative: true` unless it's verified Cloudline work.
+- **Aerial service visuals:** `public/media/roof-clean.webp` (time-lapse) and `public/media/estate-frame.webp` (real estate).
 
 ---
 

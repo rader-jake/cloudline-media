@@ -1,8 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, Check, Plus, Sparkles } from "lucide-react";
+import type { ReactNode } from "react";
+import { ArrowRight, ArrowUpRight, Check, Plus } from "lucide-react";
 import { packages } from "@/content/site";
-import { formatUSD, type Settings } from "@/lib/settings";
+import { formatUSD, priceDisplay, type Settings } from "@/lib/settings";
 import { Reveal } from "./Reveal";
 import { ViewContentTracker } from "./ViewContentTracker";
 import roofImg from "../../public/media/roof-clean.webp";
@@ -10,21 +11,132 @@ import estateImg from "../../public/media/estate-frame.webp";
 
 type PkgKey = "timelapse" | "realestate";
 
-const pages: Record<PkgKey, string> = { timelapse: "/time-lapse", realestate: "/real-estate" };
-
-export function Services({ settings }: { settings: Settings }) {
+/**
+ * The editorial service block — oversized solid + outline title, framed visual, concise copy,
+ * big price, CTA, and folded "What's included". Used for the FPV packages and the aerial service pages.
+ */
+export function FeatureBlock({
+  id,
+  index,
+  kicker,
+  title,
+  tagline,
+  body,
+  idealFor,
+  priceKicker,
+  price,
+  priceSub,
+  depositLine,
+  cta,
+  secondary,
+  includesTitle = "What's included",
+  includes,
+  disclaimer,
+  visual,
+  flip = false,
+  compact = false,
+  detailsOpen = false,
+  track,
+}: {
+  id: string;
+  index: string;
+  kicker: string;
+  title: [string, string];
+  tagline: string;
+  body?: string;
+  idealFor?: readonly string[];
+  priceKicker: string;
+  price: string;
+  priceSub?: string | null;
+  depositLine?: ReactNode;
+  cta: ReactNode;
+  secondary?: ReactNode;
+  includesTitle?: string;
+  includes: readonly string[];
+  disclaimer?: string;
+  visual: ReactNode;
+  flip?: boolean;
+  compact?: boolean;
+  detailsOpen?: boolean;
+  track: { id: string; name: string; value: number };
+}) {
+  const [t1, t2] = title;
   return (
-    <section id="services" aria-label="Services" className="relative scroll-mt-20 bg-void">
-      <ServiceFeature pkg="timelapse" index="01" settings={settings} />
-      <div className="container-x">
-        <div className="hairline" />
-      </div>
-      <ServiceFeature pkg="realestate" index="02" settings={settings} flip />
-    </section>
+    <ViewContentTracker id={track.id} name={track.name} value={track.value}>
+      <article id={id} aria-labelledby={`svc-${id}`} className={`container-x scroll-mt-24 ${compact ? "py-16 md:py-24" : "py-24 md:py-36"}`}>
+        {/* Title row */}
+        <Reveal className={`flex flex-col gap-6 md:flex-row md:items-end md:justify-between ${flip ? "md:flex-row-reverse md:text-right" : ""}`}>
+          <div>
+            <p className={`kicker ${flip ? "md:flex-row-reverse md:before:hidden" : ""}`}>
+              {index} — {kicker}
+            </p>
+            <h3 id={`svc-${id}`} className={`display mt-6 ${compact ? "text-[clamp(2rem,5.2vw,4.4rem)]" : "text-[clamp(2.3rem,7.4vw,6.2rem)]"}`}>
+              <span className="block">{t1}</span>
+              <span className="block text-outline">{t2}</span>
+            </h3>
+          </div>
+          <p className={`max-w-md text-xl font-semibold leading-snug text-white md:text-2xl ${flip ? "md:text-left" : "md:text-right"}`}>
+            {tagline.split(/(?<=\.)\s+/).map((part) => (
+              <span key={part} className="block">
+                {part}
+              </span>
+            ))}
+          </p>
+        </Reveal>
+
+        <div className={`grid items-start gap-10 lg:grid-cols-12 lg:gap-14 ${compact ? "mt-10 md:mt-12" : "mt-12 md:mt-16"} ${flip ? "lg:[&>*:first-child]:order-2" : ""}`}>
+          {/* Visual */}
+          <Reveal className={compact ? "lg:col-span-6" : "lg:col-span-7"}>{visual}</Reveal>
+
+          {/* Copy */}
+          <Reveal delay={120} className={compact ? "lg:col-span-6" : "lg:col-span-5"}>
+            {body && <p className="text-lg leading-relaxed text-mist">{body}</p>}
+
+            {idealFor && idealFor.length > 0 && (
+              <p className="mt-6 text-sm leading-relaxed text-white/80">
+                <span className="mr-2 text-xs font-bold uppercase tracking-[0.24em] text-white/45">Ideal for</span>
+                {idealFor.join(" · ")}
+              </p>
+            )}
+
+            <div className={`flex flex-wrap items-end gap-x-5 gap-y-3 ${body || idealFor?.length ? "mt-10 border-t border-line pt-8" : ""}`}>
+              <div>
+                <p className="text-[0.7rem] font-bold uppercase tracking-[0.28em] text-white/50">{priceKicker}</p>
+                <p className={`display mt-2 tracking-[-0.03em] ${compact ? "text-5xl md:text-6xl" : "text-6xl md:text-7xl"}`}>{price}</p>
+                {priceSub && <p className="mt-2 text-sm text-white/50">{priceSub}</p>}
+              </div>
+              {depositLine && <p className="mb-1.5 text-sm leading-snug text-mist">{depositLine}</p>}
+            </div>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+              {cta}
+              {secondary}
+            </div>
+
+            <details className="group mt-8 border-y border-line" open={detailsOpen}>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 font-bold [&::-webkit-details-marker]:hidden">
+                {includesTitle}
+                <Plus className="size-5 shrink-0 text-accent transition-transform duration-300 group-open:rotate-45" aria-hidden />
+              </summary>
+              <ul className="space-y-3 pb-6">
+                {includes.map((t) => (
+                  <li key={t} className="flex gap-3 text-[0.95rem] leading-snug text-white/85">
+                    <Check className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden /> {t}
+                  </li>
+                ))}
+              </ul>
+              {disclaimer && <p className="-mt-2 pb-6 text-sm leading-relaxed text-mist">{disclaimer}</p>}
+            </details>
+          </Reveal>
+        </div>
+      </article>
+    </ViewContentTracker>
   );
 }
 
-/** One editorial service block: oversized title, framed visual, concise copy, price, CTA, expandable details. */
+const pages: Record<PkgKey, string> = { timelapse: "/time-lapse", realestate: "/real-estate" };
+
+/** Aerial service block (time-lapse / real estate), used on their service pages. */
 export function ServiceFeature({
   pkg,
   index,
@@ -41,105 +153,51 @@ export function ServiceFeature({
   detailsOpen?: boolean;
 }) {
   const p = packages[pkg];
-  const price = settings.services[pkg].priceCents;
-  const [t1, t2] = p.displayTitle;
-
+  const pd = priceDisplay(settings, pkg);
   return (
-    <ViewContentTracker id={pkg} name={p.title} value={price ?? 0}>
-      <article id={pkg} aria-labelledby={`svc-${pkg}`} className="container-x scroll-mt-24 py-24 md:py-36">
-        {/* Title row */}
-        <Reveal className={`flex flex-col gap-6 md:flex-row md:items-end md:justify-between ${flip ? "md:flex-row-reverse md:text-right" : ""}`}>
-          <div>
-            <p className={`kicker ${flip ? "md:flex-row-reverse md:before:hidden" : ""}`}>
-              {index} — {pkg === "timelapse" ? "For contractors & service pros" : "For agents, brokers & owners"}
-            </p>
-            <h2 id={`svc-${pkg}`} className="display mt-6 text-[clamp(2.3rem,7.4vw,6.2rem)]">
-              <span className="block">{t1}</span>
-              <span className="block text-outline">{t2}</span>
-            </h2>
-          </div>
-          <p className={`text-xl font-semibold leading-snug text-white md:text-2xl ${flip ? "md:text-left" : "md:text-right"}`}>
-            {p.tagline.split(/(?<=\.)\s+/).map((part) => (
-              <span key={part} className="block md:whitespace-nowrap">
-                {part}
-              </span>
-            ))}
-          </p>
-        </Reveal>
-
-        <div className={`mt-12 grid items-start gap-10 md:mt-16 lg:grid-cols-12 lg:gap-14 ${flip ? "lg:[&>*:first-child]:order-2" : ""}`}>
-          {/* Visual */}
-          <Reveal className="lg:col-span-7">{pkg === "timelapse" ? <TimelapseFrame /> : <EstateFrame />}</Reveal>
-
-          {/* Copy */}
-          <Reveal delay={120} className="lg:col-span-5">
-            <p className="text-lg leading-relaxed text-mist">{p.description}</p>
-
-            <p className="mt-6 text-sm leading-relaxed text-white/80">
-              <span className="mr-2 text-xs font-bold uppercase tracking-[0.24em] text-white/45">Ideal for</span>
-              {p.idealFor.join(" · ")}
-            </p>
-
-            <div className="mt-10 flex items-end gap-5 border-t border-line pt-8">
-              <div>
-                <p className="text-[0.7rem] font-bold uppercase tracking-[0.28em] text-white/50">Starting at</p>
-                <p className="display mt-2 text-6xl tracking-[-0.03em] md:text-7xl">{price != null ? formatUSD(price) : "Quote"}</p>
-              </div>
-              <p className="mb-1.5 text-sm leading-snug text-mist">
-                {formatUSD(settings.depositCents)} deposit to book.
-                <br />
-                Credited to your total.
-              </p>
-            </div>
-
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
-              <Link href={`/book?package=${pkg}`} className="btn btn-primary min-h-14 px-8 text-base">
-                {p.cta} <ArrowRight className="size-5" aria-hidden />
-              </Link>
-              {showPageLink && (
-                <Link href={pages[pkg]} className="link-line self-start text-sm text-white/85 hover:text-white sm:self-auto">
-                  Full details <ArrowUpRight className="size-4" aria-hidden />
-                </Link>
-              )}
-            </div>
-
-            {"upgrade" in p && (
-              <div className="mt-8 flex gap-4 rounded-2xl border border-accent/25 bg-accent/[0.04] p-5">
-                <Sparkles className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
-                <div>
-                  <p className="font-bold">{p.upgrade.title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-mist">{p.upgrade.body}</p>
-                  <Link href="/book?package=fpv" className="link-line mt-3 text-sm text-accent">
-                    {p.upgrade.cta} <ArrowRight className="size-3.5" aria-hidden />
-                  </Link>
-                </div>
-              </div>
-            )}
-
-            <details className="group mt-8 border-y border-line" open={detailsOpen}>
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 font-bold [&::-webkit-details-marker]:hidden">
-                {pkg === "realestate" ? "What's included in the base aerial package" : "What's included"}
-                <Plus className="size-5 shrink-0 text-accent transition-transform duration-300 group-open:rotate-45" aria-hidden />
-              </summary>
-              <ul className="space-y-3 pb-6">
-                {p.includes.map((t) => (
-                  <li key={t} className="flex gap-3 text-[0.95rem] leading-snug text-white/85">
-                    <Check className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden /> {t}
-                  </li>
-                ))}
-              </ul>
-              {"disclaimer" in p && <p className="-mt-2 pb-6 text-sm leading-relaxed text-mist">{p.disclaimer}</p>}
-            </details>
-          </Reveal>
-        </div>
-      </article>
-    </ViewContentTracker>
+    <FeatureBlock
+      id={pkg}
+      index={index}
+      kicker={pkg === "timelapse" ? "For contractors & service pros" : "For agents, brokers & owners"}
+      title={p.displayTitle as [string, string]}
+      tagline={p.tagline}
+      body={p.description}
+      idealFor={p.idealFor}
+      priceKicker="Starting at"
+      price={pd.price != null ? formatUSD(pd.price) : "Quote"}
+      depositLine={
+        <>
+          {formatUSD(settings.depositCents)} deposit to book.
+          <br />
+          Credited to your total.
+        </>
+      }
+      cta={
+        <Link href={`/book?package=${pkg}`} className="btn btn-primary min-h-14 px-8 text-base">
+          {p.cta} <ArrowRight className="size-5" aria-hidden />
+        </Link>
+      }
+      secondary={
+        showPageLink ? (
+          <Link href={pages[pkg]} className="link-line self-start text-sm text-white/85 hover:text-white sm:self-auto">
+            Full details <ArrowUpRight className="size-4" aria-hidden />
+          </Link>
+        ) : null
+      }
+      includesTitle={pkg === "realestate" ? "What's included in the base aerial package" : "What's included"}
+      includes={p.includes}
+      disclaimer={"disclaimer" in p ? p.disclaimer : undefined}
+      visual={pkg === "timelapse" ? <TimelapseFrame /> : <EstateFrame />}
+      flip={flip}
+      detailsOpen={detailsOpen}
+      track={{ id: pkg, name: p.title, value: pd.price ?? 0 }}
+    />
   );
 }
 
 /* ── Visual frames ─────────────────────────────────────────── */
 
-function Brackets() {
+export function Brackets() {
   const c = "absolute size-5 border-white/70";
   return (
     <div aria-hidden className="pointer-events-none absolute inset-4 md:inset-5">
@@ -151,10 +209,11 @@ function Brackets() {
   );
 }
 
-function MediaNote() {
+export function MediaNote({ text = "Illustrative imagery" }: { text?: string }) {
+  if (!text) return null;
   return (
     <span className="absolute bottom-3 right-4 text-[0.58rem] font-semibold uppercase tracking-[0.22em] text-white/45 md:bottom-4 md:right-5">
-      Illustrative imagery
+      {text}
     </span>
   );
 }

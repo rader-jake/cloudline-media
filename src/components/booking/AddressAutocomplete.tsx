@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { useEffect, useId, useRef, useState } from "react";
 import { MapPin } from "lucide-react";
 

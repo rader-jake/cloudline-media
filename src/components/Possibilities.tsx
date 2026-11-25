@@ -1,84 +1,38 @@
-import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
-import { showcase } from "@/content/site";
-import { formatUSD, type Settings } from "@/lib/settings";
+import { showcase, type ShowcaseItem } from "@/content/site";
 import { Reveal } from "./Reveal";
 import { DronePass } from "./DronePass";
 
-const videoLabel = {
-  client: "",
-  illustrative: "Illustrative footage — not Cloudline Media client work",
-  concept: "Concept visualization (AI-generated)",
-} as const;
-
 /**
- * "The Possibilities." — what can be filmed, not a portfolio. With no approved footage it
- * renders a flight-plan frame with cycling scene names; set `showcase.video` to feature a reel.
+ * "Imagine the possibilities" — what FPV can capture, not a portfolio. With no videos in
+ * `showcase.items` it renders the flight-plan frame with cycling titles; the first item with a
+ * `videoUrl` becomes the featured reel, labelled unless it's verified Cloudline footage.
  */
-export function Possibilities({ settings }: { settings: Settings }) {
-  const tl = settings.services.timelapse.priceCents;
-  const re = settings.services.realestate.priceCents;
+export function Possibilities() {
+  const featured = showcase.items.find((i) => i.videoUrl);
   return (
-    <section id="possibilities" aria-labelledby="poss-title" className="relative scroll-mt-20 overflow-hidden bg-void pb-24 pt-8 md:pb-36 md:pt-12">
+    <section id="possibilities" aria-labelledby="poss-title" className="relative scroll-mt-20 overflow-hidden bg-void py-24 md:py-32">
       <div className="container-x">
         <Reveal>
           <p className="kicker">Showcase</p>
-          <h2 id="poss-title" className="display mt-6 text-[clamp(1.85rem,5.6vw,5.2rem)]">
-            The possibilities<span className="text-accent">.</span>
+          <h2 id="poss-title" className="display mt-6 text-[clamp(1.85rem,5.2vw,4.8rem)]">
+            {showcase.title}
+            <span className="text-accent">.</span>
           </h2>
           <p className="mt-5 max-w-md text-lg leading-relaxed text-mist md:text-xl">{showcase.sub}</p>
         </Reveal>
       </div>
 
       <div className="container-x mt-12 md:mt-16">
-        <DronePass>{showcase.video ? <FeaturedVideo video={showcase.video} /> : <FlightPlanFrame />}</DronePass>
-      </div>
-
-      <div className="container-x mt-6 md:mt-8">
-        <div className="grid gap-px overflow-hidden rounded-[1.25rem] border border-line bg-line md:grid-cols-2">
-          <AudienceLink
-            href="/time-lapse"
-            kicker="Contractors & seasonal crews"
-            title="Job time-lapse"
-            price={tl != null ? `From ${formatUSD(tl)}` : ""}
-            scenes={showcase.scenes.filter((s) => s.service === "timelapse").map((s) => s.label)}
-          />
-          <AudienceLink
-            href="/real-estate"
-            kicker="Agents, brokers & owners"
-            title="Real estate aerial film"
-            price={re != null ? `From ${formatUSD(re)}` : ""}
-            scenes={showcase.scenes.filter((s) => s.service === "realestate").map((s) => s.label)}
-          />
-        </div>
+        <DronePass>{featured ? <FeaturedVideo item={featured} /> : <FlightPlanFrame />}</DronePass>
       </div>
     </section>
   );
 }
 
-function AudienceLink({ href, kicker, title, price, scenes }: { href: string; kicker: string; title: string; price: string; scenes: string[] }) {
-  return (
-    <Link href={href} className="group relative flex flex-col justify-between gap-8 bg-ink p-7 transition-colors duration-500 hover:bg-panel md:p-9">
-      <div className="flex items-start justify-between gap-6">
-        <div>
-          <p className="text-[0.66rem] font-bold uppercase tracking-[0.28em] text-accent">{kicker}</p>
-          <p className="mt-3 font-display text-2xl font-bold tracking-tight md:text-3xl">{title}</p>
-        </div>
-        <span className="grid size-11 shrink-0 place-items-center rounded-full border border-white/20 transition duration-500 group-hover:rotate-45 group-hover:border-accent group-hover:bg-accent group-hover:text-void">
-          <ArrowUpRight className="size-5" aria-hidden />
-        </span>
-      </div>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <p className="max-w-xs text-sm leading-relaxed text-mist">{scenes.join(" · ")}</p>
-        {price && <p className="text-sm font-bold text-white">{price}</p>}
-      </div>
-    </Link>
-  );
-}
-
 /** Cinematic "flight plan" canvas: topo lines, a live flight path, HUD, and cycling scene titles. */
 function FlightPlanFrame() {
-  const scenes = showcase.scenes;
+  // The caption cycle CSS is timed for 8 titles (3 s each).
+  const scenes = showcase.items.slice(0, 8).map((i) => ({ label: i.title }));
   return (
     <div className="grain relative aspect-[4/5] overflow-hidden rounded-[1.25rem] border border-line bg-[radial-gradient(110%_90%_at_30%_20%,#11283b_0%,#081521_45%,#03080d_100%)] sm:aspect-[16/10] lg:aspect-[21/9]">
       {/* Topographic lines + flight path */}
@@ -138,7 +92,7 @@ function FlightPlanFrame() {
       </div>
       <div className="absolute inset-x-0 bottom-0 flex justify-between p-5 text-[0.6rem] font-bold uppercase tracking-[0.26em] text-white/40 md:p-7">
         <span className="tabular-nums">40.72° N · 73.79° W</span>
-        <span>Your project next</span>
+        <span>Your space next</span>
       </div>
 
       {/* Cycling scene titles */}
@@ -160,16 +114,14 @@ function FlightPlanFrame() {
   );
 }
 
-function FeaturedVideo({ video }: { video: NonNullable<typeof showcase.video> }) {
-  const label = videoLabel[video.kind];
+function FeaturedVideo({ item }: { item: ShowcaseItem }) {
   return (
-    <div className="relative aspect-[16/9] overflow-hidden rounded-[1.25rem] border border-line bg-panel lg:aspect-[21/9]">
-      <video className="absolute inset-0 size-full object-cover" src={video.src} poster={video.poster} controls preload="none" playsInline />
-      {label && (
-        <span className="pointer-events-none absolute left-4 top-4 rounded-full bg-void/70 px-3 py-1 text-[0.62rem] font-bold uppercase tracking-[0.2em] text-white/80 backdrop-blur">
-          {label}
-        </span>
-      )}
-    </div>
+    <figure className="relative aspect-[16/9] overflow-hidden rounded-[1.25rem] border border-line bg-panel lg:aspect-[21/9]">
+      <video className="absolute inset-0 size-full object-cover" src={item.videoUrl} poster={item.poster} controls preload="none" playsInline muted />
+      <figcaption className="pointer-events-none absolute left-4 top-4 flex flex-wrap gap-2 text-[0.62rem] font-bold uppercase tracking-[0.2em]">
+        <span className="rounded-full bg-void/70 px-3 py-1 text-white/85 backdrop-blur">{item.title}</span>
+        {item.isIllustrative && <span className="rounded-full bg-void/70 px-3 py-1 text-white/60 backdrop-blur">Illustrative — not Cloudline client work</span>}
+      </figcaption>
+    </figure>
   );
 }

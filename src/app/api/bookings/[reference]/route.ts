@@ -18,16 +18,24 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ reference: 
     booking: publicBookingView(data),
     // prefill for quote → booking links
     prefill:
-      data.package === "fpv" && ["quote_sent", "pending_payment"].includes(data.status) && data.deposit_status !== "paid"
+      data.is_inquiry && ["quote_sent", "pending_payment"].includes(data.status) && data.deposit_status !== "paid"
         ? {
             contact: { name: data.customer_name, email: data.email, phone: data.phone, businessName: data.business_name ?? "" },
             address: { line1: data.address_line1 ?? "", line2: data.address_line2 ?? "", city: data.city ?? "", state: data.state ?? "NY", zip: data.zip ?? "" },
             project: {
+              industry: data.industry ?? "",
               propertyType: data.property_type ?? "",
               description: data.project_description ?? "",
               filmingRequirements: data.filming_requirements ?? "",
               specialInstructions: data.special_instructions ?? "",
               accessNotes: data.access_notes ?? "",
+              indoorOutdoor: data.indoor_outdoor ?? "",
+              spaceSize: data.space_size ?? "",
+              intendedUse: data.intended_use ?? [],
+              socialHandle: data.social_handle ?? "",
+              isVideographer: data.is_wedding_videographer,
+              eventDate: data.event_date ?? "",
+              expectedAttendance: data.expected_attendance ?? "",
             },
           }
         : undefined,

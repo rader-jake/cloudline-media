@@ -3,25 +3,52 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { finalCta, howItWorks, intro } from "@/content/site";
 import { Reveal } from "./Reveal";
-import { ContactForm } from "./ContactForm";
+import { InquiryForm } from "./InquiryForm";
 import skyline from "../../public/media/skyline-sunset.webp";
 
-/** Brief positioning statement + three true, verifiable facts. */
+/** "The FPV difference" + value strip: one short idea, a 3-row comparison, three true facts. */
 export function Intro() {
+  const [before, after] = intro.sentence.split(" through ");
   return (
-    <section id="intro" aria-label="About Cloudline Media" className="scroll-mt-20 bg-void py-24 md:py-36">
-      <div className="container-x grid gap-12 md:grid-cols-12">
-        <Reveal className="md:col-span-3">
-          <p className="kicker">The studio</p>
-        </Reveal>
-        <Reveal delay={100} className="md:col-span-9">
-          <p className="text-[clamp(1.6rem,3.6vw,3.1rem)] font-semibold leading-[1.15] tracking-tight text-white">
-            {intro.statement.split(" across ")[0]} <span className="text-white/45">across {intro.statement.split(" across ")[1]}</span>
+    <section id="intro" aria-labelledby="intro-title" className="scroll-mt-20 bg-void py-24 md:py-32">
+      <div className="container-x grid gap-12 lg:grid-cols-12">
+        <Reveal className="lg:col-span-6">
+          <p className="kicker">{intro.label}</p>
+          <h2 id="intro-title" className="display mt-6 text-[clamp(1.9rem,3.6vw,3.3rem)]">
+            {intro.headline.replace(/\.$/, "")}
+            <span className="text-accent">.</span>
+          </h2>
+          <p className="mt-6 max-w-md text-lg leading-relaxed text-mist">
+            {before} <em className="font-semibold not-italic text-white">through</em> {after}
           </p>
-          <dl className="mt-14 grid gap-px overflow-hidden rounded-[1.25rem] border border-line bg-line sm:grid-cols-3">
+        </Reveal>
+        <Reveal delay={100} className="lg:col-span-6 lg:pt-14">
+          <table className="w-full text-left text-[0.95rem]">
+            <caption className="sr-only">Traditional aerial compared with FPV</caption>
+            <thead>
+              <tr className="text-[0.68rem] font-bold uppercase tracking-[0.26em]">
+                <th scope="col" className="w-1/2 pb-4 pr-4 font-bold text-white/45">{intro.compare.columns[0]}</th>
+                <th scope="col" className="w-1/2 pb-4 font-bold text-accent">{intro.compare.columns[1]}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {intro.compare.rows.map(([a, b]) => (
+                <tr key={a} className="border-t border-line align-top">
+                  <td className="py-4 pr-4 text-white/55">{a}</td>
+                  <td className="py-4 font-semibold text-white">{b}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="mt-4 text-xs leading-relaxed text-white/45">{intro.finePrint}</p>
+        </Reveal>
+      </div>
+      <div className="container-x mt-14 md:mt-20">
+        <Reveal>
+          <dl className="grid gap-px overflow-hidden rounded-[1.25rem] border border-line bg-line sm:grid-cols-3">
             {intro.facts.map((f) => (
               <div key={f.k} className="bg-void p-6 md:p-8">
-                <dt className="display text-5xl text-white md:text-6xl">{f.k}</dt>
+                <dt className="display text-4xl text-white md:text-5xl">{f.k}</dt>
                 <dd className="mt-3 text-sm leading-relaxed text-mist">{f.v}</dd>
               </div>
             ))}
@@ -99,12 +126,12 @@ export function FinalCta({ email, phone }: { email: string; phone: string }) {
         </Reveal>
         <Reveal delay={120} className="lg:col-span-6">
           <div className="rounded-[1.5rem] border border-line bg-void/60 p-6 backdrop-blur-md md:p-8">
-            <p className="text-lg font-bold">Custom project? Ask us first.</p>
+            <h3 className="text-lg font-bold">Tell us what you&apos;re picturing.</h3>
             <p className="mt-1 text-sm leading-relaxed text-mist">
-              Multi-day construction coverage, interior FPV, commercial properties — tell us about it and we&apos;ll reply with options and a quote.
+              Productions, wedding moments, live events or anything custom. No payment until we&apos;ve agreed the plan and sent you a quote.
             </p>
             <div className="mt-6">
-              <ContactForm />
+              <InquiryForm />
             </div>
           </div>
         </Reveal>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SERVICE_KEYS, type ServiceKey } from "@/lib/settings";
 
 // Shared client + server validation.
 
@@ -40,14 +41,41 @@ export const addressSchema = z.object({
   lng: z.number().optional(),
 });
 
+export const INDOOR_OUTDOOR = ["indoor", "outdoor", "both"] as const;
+export const SPACE_SIZES = ["small", "medium", "large", "not_sure"] as const;
+export const INTENDED_USES = ["social", "website", "ads", "other"] as const;
+export const ATTENDANCE = ["Under 100", "100–500", "500–2,000", "2,000+"] as const;
+
+const isoDate = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date")
+  .refine((v) => !Number.isNaN(Date.parse(`${v}T12:00:00Z`)), "Pick a valid date");
+/** Empty strings from selects/inputs → undefined. */
+const optionalEnum = <T extends readonly [string, ...string[]]>(values: T) =>
+  z
+    .union([z.enum(values), z.literal("")])
+    .optional()
+    .transform((v) => (v ? (v as T[number]) : undefined));
+
 export const projectSchema = z.object({
+  /** "What are we filming?" — one of the inquiry.filming values. */
+  industry: optionalText(40),
   propertyType: optionalText(60),
   description: optionalText(2000),
   filmingRequirements: optionalText(1000),
   specialInstructions: optionalText(1000),
   accessNotes: optionalText(1000),
   fpvInterest: z.boolean().optional().default(false),
+  indoorOutdoor: optionalEnum(INDOOR_OUTDOOR),
+  spaceSize: optionalEnum(SPACE_SIZES),
+  intendedUse: z.array(z.enum(INTENDED_USES)).max(4).optional().default([]),
+  socialHandle: optionalText(60),
+  isVideographer: z.boolean().optional().default(false),
+  eventDate: z.union([isoDate, z.literal("")]).optional().transform((v) => v || undefined),
+  expectedAttendance: optionalEnum(ATTENDANCE),
 });
+export type ProjectInput = z.infer<typeof projectSchema>;
 
 export const attributionSchema = z
   .object({
@@ -58,14 +86,16 @@ export const attributionSchema = z
   })
   .optional();
 
+export const serviceKeySchema = z.enum(SERVICE_KEYS as [ServiceKey, ...ServiceKey[]]);
+
 export const holdRequestSchema = z.object({
-  service: z.enum(["timelapse", "realestate"]).or(z.literal("fpv")),
+  service: serviceKeySchema,
   start: z.string().datetime(),
   contact: contactDetailsSchema,
   address: addressSchema,
   project: projectSchema,
   policyAccepted: z.literal(true, { errorMap: () => ({ message: "Please agree to the deposit & cancellation policy" }) }),
-  /** For FPV quotes that were priced by the admin. */
+  /** For inquiries/quotes that were priced by the admin. */
   quote: z.object({ reference: z.string(), token: z.string() }).optional(),
   attribution: attributionSchema,
   /** Existing unpaid hold being replaced (e.g. user went back and changed time). */
@@ -73,13 +103,28 @@ export const holdRequestSchema = z.object({
 });
 export type HoldRequest = z.infer<typeof holdRequestSchema>;
 
-export const quoteRequestSchema = z.object({
+/** Packages someone can pick on the inquiry form ("custom" = not sure / something else). */
+export const INQUIRY_PACKAGES = ["flythrough", "experience", "production", "wedding_fpv", "realestate", "timelapse", "custom"] as const;
+
+/**
+ * Inquiry / quote request (no payment). Required: name, email, phone, what we're filming, package,
+ * city, preferred date. Spam protection mirrors the contact form (honeypot, time-trap, Turnstile).
+ */
+export const inquiryRequestSchema = z.object({
   contact: contactDetailsSchema,
-  address: addressSchema,
-  project: projectSchema,
-  preferredDates: optionalText(300),
+  package: z.enum(INQUIRY_PACKAGES, { errorMap: () => ({ message: "Choose a package (or \"Not sure yet\")" }) }),
+  location: z.object({
+    city: trimmed(100).min(2, "Enter the city or town"),
+    state: z.string().trim().toUpperCase().length(2).optional().default("NY"),
+  }),
+  preferredDate: isoDate,
+  project: projectSchema.extend({ industry: trimmed(40).min(1, "Tell us what we're filming") }),
   attribution: attributionSchema,
+  website: z.string().max(0).optional(),
+  startedAt: z.number().optional(),
+  turnstileToken: z.string().optional(),
 });
+export type InquiryRequest = z.infer<typeof inquiryRequestSchema>;
 
 export const paymentRequestSchema = z.object({
   reference: z.string().min(4).max(20),
@@ -99,6 +144,9 @@ export const contactFormSchema = z.object({
     .optional()
     .refine((v) => !v || v.replace(/\D/g, "").length >= 10, "Enter a valid phone number"),
   service: optionalText(80),
+  industry: optionalText(40),
+  package: optionalText(40),
+  isVideographer: z.boolean().optional(),
   message: trimmed(3000).min(10, "Tell us a little more (10+ characters)"),
   // spam protection
   website: z.string().max(0).optional(), // honeypot — must stay empty

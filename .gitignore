@@ -8,3 +8,6 @@ out
 next-env.d.ts
 .DS_Store
 .vercel
+
+# Large video sources (only the encoded files in public/media/hero are deployed)
+assets-src/*.mp4

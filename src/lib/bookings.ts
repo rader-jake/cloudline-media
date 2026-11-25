@@ -6,6 +6,7 @@ import { sendPurchaseEvent } from "@/lib/meta-capi";
 import { upsertCalendarEvent } from "@/lib/google-calendar";
 import type { SquarePayment } from "@/lib/square";
 import type { ServiceKey } from "@/lib/settings";
+import type { ProjectInput } from "@/lib/validation";
 import { SITE_URL, configured } from "@/lib/env";
 
 export type BookingStatus =
@@ -73,6 +74,19 @@ export interface BookingRow {
   calendar_event_id: string | null;
   admin_notes: string | null;
   cancelled_reason: string | null;
+  // FPV / inquiry fields (migration 20261124_fpv_packages)
+  is_inquiry: boolean;
+  industry: string | null;
+  indoor_outdoor: string | null;
+  space_size: string | null;
+  intended_use: string[] | null;
+  social_handle: string | null;
+  is_wedding_videographer: boolean;
+  event_date: string | null;
+  expected_attendance: string | null;
+  location_review: "pending" | "approved" | "declined" | null;
+  standard_price_cents: number | null;
+  launch_pricing: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -88,12 +102,12 @@ export const generateAccessToken = () => crypto.randomBytes(24).toString("base64
 export async function releaseExpiredHolds() {
   const sb = requireDb();
   const now = new Date().toISOString();
-  // Quoted FPV bookings go back to "quote_sent" so the customer's quote link keeps working.
+  // Bookings that started as an inquiry go back to "quote_sent" so the customer's quote link keeps working.
   await sb
     .from("bookings")
     .update({ status: "quote_sent", busy_start: null, busy_end: null, scheduled_start: null, scheduled_end: null, hold_expires_at: null })
     .eq("status", "pending_payment")
-    .eq("package", "fpv")
+    .eq("is_inquiry", true)
     .not("deposit_status", "in", "(processing,paid)")
     .lt("hold_expires_at", now);
   const { data, error } = await sb
@@ -196,6 +210,26 @@ async function notifyAfterPayment(b: BookingRow) {
 }
 
 /** Fields safe to show the customer on the confirmation page. */
+/** Maps validated project fields to their booking columns (shared by holds and inquiries). */
+export function projectColumns(p: ProjectInput) {
+  return {
+    industry: p.industry ?? null,
+    property_type: p.industry && p.industry !== "real-estate" && p.industry !== "realestate" ? null : (p.propertyType ?? null),
+    project_description: p.description ?? null,
+    filming_requirements: p.filmingRequirements ?? null,
+    special_instructions: p.specialInstructions ?? null,
+    access_notes: p.accessNotes ?? null,
+    fpv_interest: p.fpvInterest ?? false,
+    indoor_outdoor: p.indoorOutdoor ?? null,
+    space_size: p.spaceSize ?? null,
+    intended_use: p.intendedUse ?? [],
+    social_handle: p.socialHandle ?? null,
+    is_wedding_videographer: p.isVideographer ?? false,
+    event_date: p.eventDate ?? null,
+    expected_attendance: p.expectedAttendance ?? null,
+  };
+}
+
 export function publicBookingView(b: BookingRow) {
   return {
     id: b.id,
@@ -213,6 +247,8 @@ export function publicBookingView(b: BookingRow) {
     depositCents: b.deposit_cents,
     remainingCents: Math.max(0, (b.quoted_total_cents ?? 0) - b.deposit_cents),
     receiptUrl: b.square_receipt_url,
+    /** "pending" = booking request awaiting our location review (safety, permissions). */
+    locationReview: b.location_review,
     // Only claim an email was delivered when Resend actually accepted it.
     emailStatus: (b.confirmation_email_sent_at ? "sent" : configured.email() ? "pending" : "not_configured") as
       | "sent"

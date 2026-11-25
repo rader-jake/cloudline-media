@@ -29,6 +29,9 @@ export const longDate = (date: string) => {
   return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
 };
 
+/** Stable object so the "loading" state doesn't change identity on every render. */
+const LOADING: MonthState = { status: "loading" };
+
 export function Calendar({
   service,
   quote,
@@ -51,7 +54,7 @@ export function Calendar({
   const [month, setMonth] = useState(value?.date.slice(0, 7) ?? firstMonth);
   const [cache, setCache] = useState<Record<string, MonthState>>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(value?.date ?? null);
-  const state = cache[month] ?? { status: "loading" };
+  const state = cache[month] ?? LOADING;
 
   const load = useCallback(
     async (m: string, force = false) => {

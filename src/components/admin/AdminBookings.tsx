@@ -4,12 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { Download, ExternalLink, Loader2, MapPin, RefreshCw, TriangleAlert, X } from "lucide-react";
 import type { BookingRow, BookingStatus } from "@/lib/bookings";
 import { formatUSD } from "@/lib/settings";
+import { inquiry } from "@/content/site";
 import { Calendar } from "@/components/booking/Calendar";
 import type { SelectedSlot } from "@/components/booking/types";
 
 const SCOPES = [
   { key: "upcoming", label: "Upcoming" },
-  { key: "quotes", label: "FPV quotes" },
+  { key: "quotes", label: "Inquiries & quotes" },
   { key: "pending", label: "Awaiting payment" },
   { key: "past", label: "Past" },
   { key: "all", label: "All" },
@@ -118,6 +119,7 @@ export function AdminBookings() {
                     </td>
                     <td className="block pt-2 md:table-cell md:p-3">
                       <StatusBadge status={b.status} />
+                      {b.location_review === "pending" && b.status === "confirmed" && <span className="ml-2 text-xs font-semibold text-warn">Location review</span>}
                     </td>
                   </tr>
                 ))}
@@ -230,16 +232,60 @@ function BookingDrawer({ booking: b, onClose, onUpdated }: { booking: BookingRow
         </Section>
 
         <Section title="Project">
-          <Field k="Property type" v={b.property_type ?? "—"} />
-          <Field k="Description" v={b.project_description ?? "—"} />
-          <Field k="Filming requirements" v={b.filming_requirements ?? "—"} />
-          <Field k="Special instructions" v={b.special_instructions ?? "—"} />
+          {b.industry && <Field k="Filming" v={inquiry.filming.find((o) => o.value === b.industry)?.label ?? b.industry} />}
+          {b.is_wedding_videographer && <Field k="Tag" v="Wedding videographer" />}
+          {b.property_type && <Field k="Property type" v={b.property_type} />}
+          {b.event_date && <Field k="Event" v={`${b.event_date}${b.expected_attendance ? ` · ${b.expected_attendance} expected` : ""}`} />}
+          {b.social_handle && <Field k="Instagram/TikTok" v={b.social_handle} />}
+          {(b.indoor_outdoor || b.space_size) && <Field k="Space" v={[b.indoor_outdoor, b.space_size?.replace("_", " ")].filter(Boolean).join(" · ")} />}
+          {(b.intended_use?.length ?? 0) > 0 && <Field k="Video use" v={b.intended_use!.join(", ")} />}
+          <Field k="Flight / description" v={b.project_description ?? "—"} />
+          {b.filming_requirements && <Field k="Filming requirements" v={b.filming_requirements} />}
+          {b.special_instructions && <Field k="Special instructions" v={b.special_instructions} />}
           <Field k="Access notes" v={b.access_notes ?? "—"} />
           {b.fpv_interest && <Field k="FPV add-on" v="Customer is interested — follow up with a quote" />}
         </Section>
 
+        {/* Location review (FPV packages): paid bookings are a request until approved */}
+        {b.location_review && b.status !== "cancelled" && (
+          <Section title="Location review">
+            <Field
+              k="Status"
+              v={
+                <span className={b.location_review === "approved" ? "text-success" : b.location_review === "declined" ? "text-danger" : "text-warn"}>
+                  {b.location_review === "pending" ? "Pending — review layout, ceiling height, safety, permissions" : b.location_review === "approved" ? "Approved" : "Declined"}
+                </span>
+              }
+            />
+            {paid && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  disabled={busy || b.location_review === "approved"}
+                  className="btn btn-primary"
+                  onClick={() => patch({ action: "location_review", value: "approved", notify: true }, "Location approved — customer emailed.")}
+                >
+                  Approve
+                </button>
+                <button
+                  disabled={busy || b.location_review === "declined"}
+                  className="btn btn-ghost"
+                  onClick={() =>
+                    confirm("Decline this location? The customer is emailed that we'll offer alternatives or a full deposit refund. Refunds are issued in Square.") &&
+                    patch({ action: "location_review", value: "declined", notify: true }, "Marked declined — customer emailed. Refund in Square if they choose it.")
+                  }
+                >
+                  Decline
+                </button>
+              </div>
+            )}
+          </Section>
+        )}
+
         <Section title="Payment">
-          <Field k="Quoted total" v={b.quoted_total_cents != null ? formatUSD(b.quoted_total_cents) : "—"} />
+          <Field
+            k="Total"
+            v={b.quoted_total_cents != null ? `${formatUSD(b.quoted_total_cents)}${b.launch_pricing && b.standard_price_cents ? ` (launch; standard ${formatUSD(b.standard_price_cents)})` : ""}` : "—"}
+          />
           <Field k="Deposit" v={`${formatUSD(b.deposit_cents)} · ${b.deposit_status}`} />
           <Field k="Remaining" v={b.quoted_total_cents != null ? formatUSD(Math.max(0, b.quoted_total_cents - b.deposit_cents)) : "—"} />
           <Field k="Square payment ID" v={b.square_payment_id ?? "—"} />
@@ -256,8 +302,8 @@ function BookingDrawer({ booking: b, onClose, onUpdated }: { booking: BookingRow
           <Field k="Created" v={dt(b.created_at)} />
         </Section>
 
-        {/* FPV quote pricing */}
-        {b.package === "fpv" && ["quote_requested", "quote_sent"].includes(b.status) && (
+        {/* Inquiry pricing → sends the customer a private booking link */}
+        {b.is_inquiry && ["quote_requested", "quote_sent"].includes(b.status) && (
           <Section title="Send quote">
             <div className="grid grid-cols-2 gap-3">
               <label className="text-sm">
